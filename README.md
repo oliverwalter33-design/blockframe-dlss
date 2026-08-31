@@ -1,12 +1,10 @@
 # BlockFrame DLSS
 
-<p align="center">
-  <img src="docs/assets/blockframe-dlss-icon.png" alt="BlockFrame DLSS logo" width="220">
-</p>
-
 BlockFrame DLSS is an experimental client-side NeoForge mod that integrates NVIDIA DLSS Super Resolution and DLAA into Minecraft 26.2's native Vulkan renderer.
 
 > **Experimental:** image quality, compatibility and performance can vary by GPU, driver, resolution, resource pack, shader pack and other rendering mods.
+
+> **Official source:** Modrinth ownership and artifact correspondence are documented in [MODRINTH-OWNERSHIP.md](MODRINTH-OWNERSHIP.md).
 
 ## Download
 
@@ -261,3 +259,4 @@ The public project name is **BlockFrame DLSS**. The internal NeoForge mod ID and
 Original Java, JNI and shader integration code is licensed under the [MIT License](LICENSE). NVIDIA binaries and materials are not covered by MIT and remain under the separate license texts included with release JARs. Before redistributing a build, review `META-INF/nvidia/NOTICE.txt` and the accompanying NVIDIA license files inside the JAR. NVIDIA's RTX SDK license also requires prior notification to NVIDIA before a commercial release that incorporates DLSS or NGX.
 
 This software uses NVIDIA Streamline and NVIDIA DLSS. BlockFrame DLSS is an independent community project and is not affiliated with, sponsored by or endorsed by NVIDIA, Mojang Studios, Microsoft, NeoForge, CaffeineMC or CurseForge. NVIDIA, NVIDIA DLSS, NVIDIA RTX and GeForce RTX are trademarks or registered trademarks of NVIDIA Corporation; other product names and trademarks belong to their respective owners.
+
