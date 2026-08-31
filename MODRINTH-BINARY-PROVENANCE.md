@@ -86,7 +86,7 @@ development binaries and stages only the signed production set.
 3. Build the JNI bridge and both SPIR-V variants with
    `native/build-native.ps1`; the script writes source/output/compiler
    provenance into `native-source-v1.properties`.
-4. Run `gradlew.bat clean test build`. Gradle verifies that the source stamp
+4. Run `gradle clean test build` with Gradle 9.2.1. Gradle verifies that the source stamp
    still matches every project-built native output before creating the JAR.
 5. Run `scripts/verify-native-provenance.ps1 -JarPath <jar>` to compare the
    finished artifact with the exact submitted JAR and native-entry hashes.
