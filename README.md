@@ -4,7 +4,7 @@ BlockFrame DLSS is an experimental client-side NeoForge mod that integrates NVID
 
 > **Experimental:** image quality, compatibility and performance can vary by GPU, driver, resolution, resource pack, shader pack and other rendering mods.
 
-> **Official source:** Modrinth ownership and artifact correspondence are documented in [MODRINTH-OWNERSHIP.md](MODRINTH-OWNERSHIP.md).
+> **Official source:** Modrinth ownership and artifact correspondence are documented in [MODRINTH-OWNERSHIP.md](MODRINTH-OWNERSHIP.md). Every native DLL and SPIR-V file in the submitted candidate is mapped to its checked-in source or exact official NVIDIA release in [MODRINTH-BINARY-PROVENANCE.md](MODRINTH-BINARY-PROVENANCE.md).
 
 ## Download
 
@@ -64,9 +64,14 @@ Native SDK binaries are deliberately not tracked in Git. To create a working rel
 .\scripts\stage-nvidia-runtime.ps1 -StreamlineBin 'C:\path\to\streamline\bin\x64'
 .\native\build-native.ps1
 .\gradlew.bat clean test build
+.\scripts\verify-native-provenance.ps1 -JarPath '.\build\libs\blockframe-dlss-0.3.18-neoforge-26.2.jar'
 ```
 
 `build` intentionally fails when a required native runtime file is absent. The finished JAR is written to `build\libs`.
+The final verification command checks the candidate JAR SHA-256 and every
+native binary entry against the review manifest. For a new release, pass that
+release's expected JAR hash explicitly with `-ExpectedJarSha256` and update the
+pinned entry hashes in the verification script.
 
 The native build script also accepts explicit `-StreamlineInclude`, `-VulkanInclude`, `-JniInclude`, `-ZigExecutable` and `-GlslcExecutable` parameters.
 
