@@ -26,6 +26,9 @@ The exact source-publication commit before this verification file was added is:
 
 `d1f2151f07ad11b9431382774ecb74f4d9271e20`
 
+The complete source/binary map requested for technical review is in
+[`MODRINTH-BINARY-PROVENANCE.md`](MODRINTH-BINARY-PROVENANCE.md).
+
 ## Statement for Modrinth moderation
 
 The maintainer controlling this GitHub repository identifies it as the official source repository for the BlockFrame DLSS mod submitted to Modrinth. The repository contains the Java, native C++, and shader source used by the project, while generated binaries and third-party NVIDIA runtime binaries are intentionally excluded. Applicable NVIDIA notices and license texts remain included.
