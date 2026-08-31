@@ -953,6 +953,7 @@ tasks.register('sourceZip', Zip) {
     reproducibleFileOrder = true
 
     from(layout.projectDirectory) {
+        include '.gitattributes'
         include 'build.gradle'
         include 'CHANGELOG.md'
         include 'CHANGELOG-DE.md'
