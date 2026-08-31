@@ -25,3 +25,12 @@ native DLL/SPIR-V hashes.
 The six NVIDIA DLLs are the same signed Streamline 2.12.0 production files as
 in 0.3.18. The three project-built output hashes are version-specific and are
 listed in the top-level `MODRINTH-BINARY-PROVENANCE.md`.
+
+The repository's native reproducibility workflow downloads LWJGL `3.4.1` and
+its shaderc native library from Maven Central with exact SHA-256 pins, then
+uses [`CompileMotionShaders.java`](CompileMotionShaders.java) to recreate both
+SPIR-V files byte-for-byte. The historical bridge source and published DLL are
+both hash-verified, but an exact bridge rebuild is not claimed: version 0.3.16
+recorded Zig `0.16.0` but did not preserve archive-level identities for every
+Vulkan/JNI header input. Version 0.3.18 fixes that provenance gap and is fully
+rebuilt by CI from hash-pinned tools and headers.

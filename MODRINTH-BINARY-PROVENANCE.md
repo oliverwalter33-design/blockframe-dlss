@@ -107,7 +107,17 @@ development binaries and stages only the signed production set.
    published artifact with its exact JAR and version-specific native-entry
    hashes.
 
-The repository workflow runs the source-side provenance check on every push
-and pull request. A local release build additionally performs the native
-runtime checks because NVIDIA's redistributable binaries are intentionally not
-stored in GitHub.
+The repository has two public verification workflows:
+
+- `source-provenance.yml` performs the fast source/stamp check on every push
+  and pull request.
+- `native-reproducibility.yml` downloads both exact Modrinth JARs, verifies all
+  nine DLL/SPIR-V entries in each, downloads and verifies the official
+  Streamline archive, rebuilds all three 0.3.18 project-owned outputs from
+  hash-pinned Zig, LunarG/glslc and JDK inputs, and recreates both 0.3.16
+  shaders with hash-pinned LWJGL shaderc 3.4.1.
+
+The 0.3.16 bridge source, source stamp, and published DLL remain fully
+hash-verified, but CI does not claim an exact bridge rebuild because that old
+release did not record archive-level identities for every Vulkan/JNI header.
+No downloaded or rebuilt NVIDIA binary is uploaded as a workflow artifact.
