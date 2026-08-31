@@ -20,7 +20,7 @@ The source in this repository corresponds to the BlockFrame DLSS 0.3.18 review c
 | Artifact | SHA-256 |
 | --- | --- |
 | `blockframe-dlss-0.3.18-unapproved-bricks-farlod-history-candidate-neoforge-26.2.jar` | `32FA02E499476CA25066EFAF2EF1485C743C2938BA8EFF0C7572B823618CC6F1` |
-| `BlockFrame-DLSS-0.3.18-Source-Code.zip` | `BAAD28B8311C350497BC73544EB68FBD33A2739340FCE3C71C95605651380088` |
+| `blockframe-dlss-0.3.18-neoforge-26.2-sources.zip` | `84F72E0AD57A059A1D5F1765A532F1865A00A8BBD82DDDFB77928EC9E94E11E6` |
 
 The exact source-publication commit before this verification file was added is:
 
@@ -43,3 +43,4 @@ Control of the already existing CurseForge project should be demonstrated separa
 For a direct cross-link, set the Modrinth project's **Settings → Links → Source code** field to:
 
 `https://github.com/oliverwalter33-design/blockframe-dlss`
+
