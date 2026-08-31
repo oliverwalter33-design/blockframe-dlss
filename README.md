@@ -1,6 +1,7 @@
 # BlockFrame DLSS
 
 [![Source provenance](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/source-provenance.yml/badge.svg)](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/source-provenance.yml)
+[![Native reproducibility](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/native-reproducibility.yml/badge.svg)](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/native-reproducibility.yml)
 
 BlockFrame DLSS is an experimental client-side NeoForge mod that integrates NVIDIA DLSS Super Resolution and DLAA into Minecraft 26.2's native Vulkan renderer.
 
@@ -80,6 +81,13 @@ SHA-256 and checks every native binary entry against its version-specific
 review manifest. For a new release, add its JAR and native-entry hashes to the
 verification script; `-ExpectedJarSha256` can additionally pin an invocation
 to one expected artifact.
+
+The public native-reproducibility workflow additionally rebuilds the
+project-owned outputs from pinned tools and headers. Both shaders reproduce
+byte-for-byte. The 0.3.18 bridge reproduces outside 20 structurally identified
+run-dependent PE/CodeView metadata bytes; the exact scope and normalized hash
+are documented in
+[MODRINTH-BINARY-PROVENANCE.md](MODRINTH-BINARY-PROVENANCE.md#exact-scope-of-the-0318-bridge-rebuild-check).
 
 The native build script also accepts explicit `-StreamlineInclude`, `-VulkanInclude`, `-JniInclude`, `-ZigExecutable` and `-GlslcExecutable` parameters.
 
@@ -272,3 +280,4 @@ The public project name is **BlockFrame DLSS**. The internal NeoForge mod ID and
 Original Java, JNI and shader integration code is licensed under the [MIT License](LICENSE). NVIDIA binaries and materials are not covered by MIT and remain under the separate license texts included with release JARs. Before redistributing a build, review `META-INF/nvidia/NOTICE.txt` and the accompanying NVIDIA license files inside the JAR. NVIDIA's RTX SDK license also requires prior notification to NVIDIA before a commercial release that incorporates DLSS or NGX.
 
 This software uses NVIDIA Streamline and NVIDIA DLSS. BlockFrame DLSS is an independent community project and is not affiliated with, sponsored by or endorsed by NVIDIA, Mojang Studios, Microsoft, NeoForge, CaffeineMC or CurseForge. NVIDIA, NVIDIA DLSS, NVIDIA RTX and GeForce RTX are trademarks or registered trademarks of NVIDIA Corporation; other product names and trademarks belong to their respective owners.
+
