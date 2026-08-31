@@ -162,13 +162,7 @@ class StreamlineRequirementsSourceContractTest {
                 "VulkanDeviceCapabilityProbe.query("
             )
         );
-        assertTrue(
-            bootstrap.contains("availability.apiVersion()")
-        );
-        assertTrue(
-            probe.contains("candidates.addAll(requiredDeviceExtensions);")
-        );
-        assertTrue(
+        assertFalse(
             negotiator.contains(
                 "EXT_BUFFER_DEVICE_ADDRESS,\n            VULKAN_API_1_2"
             )

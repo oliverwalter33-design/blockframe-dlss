@@ -75,9 +75,9 @@ class ReleaseDiagnosticsIsolationContractTest {
             nativeArtifact("motion_vectors.debug.comp.spv")
         );
 
-        assertEquals(Set.of(0, 2, 3, 6, 7, 8), release.bindings());
+        assertEquals(Set.of(0, 2, 3, 7, 8), release.bindings());
         assertEquals(
-            Set.of(0, 2, 3, 4, 5, 6, 7, 8, 9),
+            Set.of(0, 2, 3, 4, 5, 7, 8, 9),
             diagnostics.bindings()
         );
         assertFalse(release.bindings().contains(4));
@@ -97,7 +97,7 @@ class ReleaseDiagnosticsIsolationContractTest {
     }
 
     @Test
-    void sourceSelectsReleaseShaderAndSixBindingLayoutByDefault()
+    void sourceSelectsReleaseShaderAndFiveBindingLayoutByDefault()
         throws Exception {
         String motion = source(
             "src/main/java/de/morau/nvidiadlss/MotionVectorGenerator.java"
@@ -106,7 +106,7 @@ class ReleaseDiagnosticsIsolationContractTest {
         String gradle = source("build.gradle");
 
         assertTrue(motion.contains(
-            "static final int RELEASE_DESCRIPTOR_BINDING_COUNT = 6;"
+            "static final int RELEASE_DESCRIPTOR_BINDING_COUNT = 5;"
         ));
         assertTrue(motion.contains(
             "private static final String RELEASE_SHADER ="

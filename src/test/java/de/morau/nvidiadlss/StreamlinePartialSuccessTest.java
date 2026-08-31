@@ -94,9 +94,11 @@ class StreamlinePartialSuccessTest {
         assertTrue(nisEvaluate.contains("sl::kFeatureNIS"));
         assertTrue(nisEvaluate.contains("nisCmd"));
         assertFalse(nisEvaluate.contains("dlssCmd"));
-        assertTrue(evaluation.contains("const sl::BaseStructure* nisInputs[]"));
-        assertTrue(nisEvaluate.contains("nisInputs"));
-        assertTrue(nisEvaluate.contains("3,"));
+        assertTrue(
+            evaluation.contains(
+                "return packEvaluationResults(0, -1212);"
+            )
+        );
         assertTrue(
             evaluation.contains(
                 "return packEvaluationResults(\n"

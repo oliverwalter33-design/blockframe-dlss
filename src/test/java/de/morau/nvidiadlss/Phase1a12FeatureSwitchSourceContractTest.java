@@ -195,36 +195,21 @@ class Phase1a12FeatureSwitchSourceContractTest {
             "DlssRenderer.currentLodBias()",
             original
         );
+        int cache = materialSampler.indexOf(
+            "createCache(device)",
+            bias
+        );
         assertTrue(gate >= 0);
         assertTrue(original > gate);
         assertTrue(bias > original);
-        assertFalse(materialSampler.contains("createCache(device)"));
+        assertTrue(cache > bias);
         assertTrue(
             materialSampler.substring(gate, original)
                 .contains("disabled by process feature policy")
         );
-        String activation = section(
-            policy,
-            "public static synchronized boolean activateGeneration(",
-            "public static synchronized boolean deactivateGeneration("
-        );
-        int activationGate = activation.indexOf(
-            "FeatureId.MATERIAL_SAMPLER_CACHE"
-        );
-        int switchGeneration = activation.indexOf(
-            "cacheLifecycle.switchTo(",
-            activationGate
-        );
-        int create = activation.indexOf(
-            "createCache(device)",
-            switchGeneration
-        );
-        assertTrue(activationGate >= 0);
-        assertTrue(switchGeneration > activationGate);
-        assertTrue(create > switchGeneration);
-        assertTrue(
-            activation.substring(activationGate, switchGeneration)
-                .contains("cacheLifecycle.deactivate(PRODUCTION_CLOSER)")
+        assertFalse(
+            materialSampler.substring(0, gate)
+                .contains("createCache(")
         );
     }
 

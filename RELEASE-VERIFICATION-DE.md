@@ -1,39 +1,6 @@
-# BlockFrame DLSS – Release-Prüfung
+# BlockFrame DLSS 0.3.16 – Release-Prüfung
 
-## 0.3.18 Bricks-Fern-LOD-Kandidat – UNVERÖFFENTLICHT / NICHT FREIGEGEBEN
-
-- Gültig ausschließlich für das exakt gepinnte Bricks-`1.0.1`-Artefakt
-  `B380F3678A0AB1E0BA3375994FD309D72638F5CA3503C931D40E93AEA79426B8`
-  und die exakt geprüften Minecraft-26.2-/NeoForge-26.2.0.57-Klassen und
-  Aufrufstellen. Jede Abweichung deaktiviert den Pfad fail-closed.
-- Bis einschließlich 64 Blöcke bleiben Originalrenderer und Originalextraktion
-  von Bricks unverändert. Jenseits davon läuft ausschließlich der gecachte,
-  nach Komponente/Ebene/Richtung gegreedete und nach Textur/Transluzenz
-  gebatchte Fernmesh-Pfad bis zu Minecrafts effektiver Sichtweite.
-- `blockframe.compat.bricksCompositeViewDistanceBlocks=64` ist die
-  Vanilla-Distanzkontrolle. Jeder akzeptierte Wert über 64 aktiviert den
-  Fernmesh-Pfad; 96/128/160 sind keine rohen Vollgeometrie-Distanzen.
-- Texturatlasbereich, relative UV-Grenzen, UV-Drehung, Silhouette sowie
-  Material- und Transluzenzgrenzen sind durch Quell-/Bytecode-Verträge und
-  gezielte Tests abgedeckt. Bei Identitätswechsel der Bricks-Flächenliste wird
-  der lokale Mesh-Cache ungültig.
-- Zwei getrennte vollständige Clean-Builds sind bytegleich. Jeder ist mit 997
-  Tests (994 bestanden, 3 übersprungen, 0 Fehler), Produktions-JAR- und
-  Dedicated-Server-Grenze, Phase 2A.0B sowie Native-Runtime-Prüfung bestanden.
-  Das 34.003.950-Byte-JAR hat SHA-256
-  `32FA02E499476CA25066EFAF2EF1485C743C2938BA8EFF0C7572B823618CC6F1`.
-- Inhaltsvergleich: gegenüber E348 `+19/~2/-0`, gegenüber dem abgelösten
-  82555-Distanzkandidaten `+13/~8/-0`. Alle neun nativen DLL/SPV/BIN-Einträge
-  sind zu beiden bytegleich; gebündelt sind null Bricks-Klassen und null
-  Bricks-JARs.
-- Der Kandidat ist als ausdrücklich autorisierter Vergleichsstand im
-  Hauptprofil installiert. Die erste Nutzer-Sichtprüfung meldet entfernte
-  Dächer, Fassaden und Bricks-Strukturen als aktuell sehr gut. Längere FPS-/
-  Frame-Zeit-Prüfung und transparente Blockgrenzen bleiben offen. Eine
-  Veröffentlichung oder Release-Freigabe besteht nicht; der separat
-  dokumentierte globale Vulkan-Shutdown-VUID bleibt Release-Blocker.
-
-## 0.3.16 – Bewiesen
+## Bewiesen
 
 - Ausgangs-JAR dev.5:
   `5C7D06F99E26FF9747FA5672F332F31A5D52C7D0FAD9AA2AEF6D9C457E480D07`
@@ -63,7 +30,7 @@
   installiert. Eine erneute visuelle Nutzerprüfung nach dem Neustart steht
   noch aus; sie ändert den bereits bestandenen Render-Smoke nicht.
 
-## 0.3.16 – Nicht als bestanden gewertet
+## Nicht als bestanden gewertet
 
 - Die getrennten Phase-2A.0B-Benchmark-Harness-Tests benötigen externe
   Fixture-Dateien aus den auf Nutzerwunsch gelöschten Testinstanzen. Das
@@ -72,7 +39,7 @@
   gestrichen.
 - Kein CurseForge-Upload durchgeführt.
 
-## 0.3.16 – Release-Differenzen gegenüber dev.5
+## Release-Differenzen gegenüber dev.5
 
 - stabile Versionskennung `0.3.16-neoforge-26.2`
 - direkte Sodium-0.9.1-Menüintegration

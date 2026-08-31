@@ -74,7 +74,6 @@ public final class DlssRenderer {
     private static boolean wasActive;
     private static boolean resetRequested = true;
     private static boolean optimalSettingsRefreshRequested = true;
-    private static long samplerReloadEpoch;
     private static String resetReason = "Initialisierung";
     private static boolean evaluationLogged;
     private static DlssMode allocatedMode = DlssMode.OFF;
@@ -160,9 +159,6 @@ public final class DlssRenderer {
 
     static void requestOptimalSettingsRefresh(String reason) {
         optimalSettingsRefreshRequested = true;
-        if (samplerReloadEpoch != Long.MAX_VALUE) {
-            samplerReloadEpoch++;
-        }
         requestReset(reason);
     }
 
@@ -246,13 +242,7 @@ public final class DlssRenderer {
     }
 
     public static float currentLodBias() {
-        if (
-            !worldPass
-                || outputWidth <= 0
-                || outputHeight <= 0
-                || lowWidth <= 0
-                || lowHeight <= 0
-        ) return 0.0F;
+        if (!worldPass || outputWidth <= 0 || lowWidth <= 0) return 0.0F;
         return currentLodBiasForDimensions();
     }
 
@@ -275,8 +265,6 @@ public final class DlssRenderer {
             ? requestedMode
             : DlssMode.OFF;
         boolean vrRunning = VivecraftCompat.isVrRunning();
-        boolean minimizedOutput =
-            highTarget.width <= 0 || highTarget.height <= 0;
         if (
             deviceCloseStarted
                 || !shouldRenderLevel
@@ -284,25 +272,13 @@ public final class DlssRenderer {
                 || !DlssBootstrap.connected()
                 || !DlssStatus.ready()
                 || vrRunning
-                || minimizedOutput
         ) {
-            DlssSamplerPolicy.deactivateGeneration(
-                DlssBootstrap.vulkanBackend()
-            );
             ThirdPersonGeometryMotion.suspend();
-            if (wasActive) requestReset(!shouldRenderLevel ? "unterbrochene Rendersequenz"
-                : vrRunning
-                    ? "VR-Übergang"
-                    : minimizedOutput
-                        ? "minimierte 0x0-Ausgabe"
-                        : "DLSS deaktiviert");
+            if (wasActive) requestReset(!shouldRenderLevel ? "unterbrochene Rendersequenz" : vrRunning ? "VR-Übergang" : "DLSS deaktiviert");
             wasActive = false;
             return highTarget;
         }
         if (!(highTarget.getColorTexture() instanceof VulkanGpuTexture) || !(highTarget.getDepthTexture() instanceof VulkanGpuTexture)) {
-            DlssSamplerPolicy.deactivateGeneration(
-                DlssBootstrap.vulkanBackend()
-            );
             DlssStatus.unavailable("Das aktive Grafik-Backend ist nicht Vulkan");
             return highTarget;
         }
@@ -356,9 +332,6 @@ public final class DlssRenderer {
             );
             return lowTarget;
         } catch (Throwable error) {
-            DlssSamplerPolicy.deactivateGeneration(
-                DlssBootstrap.vulkanBackend()
-            );
             ThirdPersonGeometryMotion.suspend();
             failedResourceMode = mode;
             failedResourceWidth = highTarget.width;
@@ -414,12 +387,6 @@ public final class DlssRenderer {
     }
 
     private static void ensureResources(DlssMode mode, int width, int height) {
-        VulkanDevice backend = DlssBootstrap.vulkanBackend();
-        if (backend == null) {
-            throw new IllegalStateException(
-                "DLSS-Ressourcenwechsel ohne verbundenes Vulkan-Gerät abgelehnt"
-            );
-        }
         boolean currentResourcesMatchOutput =
             lowTarget != null
                 && auxiliaryResources != null
@@ -437,10 +404,9 @@ public final class DlssRenderer {
         ) {
             if (motionGenerator == null) {
                 motionGenerator = new MotionVectorGenerator(
-                    backend
+                    DlssBootstrap.vulkanBackend()
                 );
             }
-            activateMaterialSamplerGeneration(backend, mode);
             return;
         }
 
@@ -458,12 +424,17 @@ public final class DlssRenderer {
             optimalSettingsRefreshRequested = false;
             if (motionGenerator == null) {
                 motionGenerator = new MotionVectorGenerator(
-                    backend
+                    DlssBootstrap.vulkanBackend()
                 );
             }
-            activateMaterialSamplerGeneration(backend, mode);
             logIntegrationState("Optimal-Settings erneut bestätigt");
             return;
+        }
+        VulkanDevice backend = DlssBootstrap.vulkanBackend();
+        if (backend == null) {
+            throw new IllegalStateException(
+                "DLSS-Ressourcenwechsel ohne verbundenes Vulkan-Gerät abgelehnt"
+            );
         }
         backend.graphicsQueue().waitIdle();
         int resetResult = NativeStreamline.resetViewport(0);
@@ -519,7 +490,7 @@ public final class DlssRenderer {
             labelLowResolutionTarget(lowTarget);
             if (motionGenerator == null) {
                 motionGenerator = new MotionVectorGenerator(
-                    backend
+                    DlssBootstrap.vulkanBackend()
                 );
             }
         } catch (Throwable error) {
@@ -575,7 +546,6 @@ public final class DlssRenderer {
         outputHeight = height;
         allocatedMode = mode;
         optimalSettingsRefreshRequested = false;
-        activateMaterialSamplerGeneration(backend, mode);
         nativeOutlineLogged = false;
         nativeOutlineDepthWarningLogged = false;
         if (previousResources != null) {
@@ -716,10 +686,6 @@ public final class DlssRenderer {
             VulkanGpuTextureView depthView = (VulkanGpuTextureView)lowTarget.getDepthTextureView();
             VulkanGpuTexture motion = (VulkanGpuTexture)resources.motionTexture;
             VulkanGpuTextureView nativeMotionView = (VulkanGpuTextureView)resources.motionView;
-            VulkanGpuTexture historyBias =
-                (VulkanGpuTexture)resources.historyBiasTexture;
-            VulkanGpuTextureView nativeHistoryBiasView =
-                (VulkanGpuTextureView)resources.historyBiasView;
             VulkanGpuTexture output = (VulkanGpuTexture)resources.outputTexture;
             VulkanGpuTextureView nativeOutputView = (VulkanGpuTextureView)resources.outputView;
             VulkanGpuTexture sharpen = (VulkanGpuTexture)resources.sharpenTexture;
@@ -929,7 +895,6 @@ public final class DlssRenderer {
                     motionGenerator.dispatch(commandBuffer, colorView, depthView, nativeMotionView,
                         (VulkanGpuTextureView)resources.depthDebugView, (VulkanGpuTextureView)resources.motionDebugView,
                         (VulkanGpuTextureView)resources.motionValidityView,
-                        nativeHistoryBiasView,
                         (VulkanGpuTextureView)resources.transparencyHintView,
                         inverseViewProjection, previousVp, clipToPrev,
                         lowWidth, lowHeight, jitterX, jitterY,
@@ -938,7 +903,6 @@ public final class DlssRenderer {
                     motionGenerator.dispatch(commandBuffer, colorView, depthView, nativeMotionView,
                         (VulkanGpuTextureView)resources.depthDebugView, (VulkanGpuTextureView)resources.motionDebugView,
                         (VulkanGpuTextureView)resources.motionValidityView,
-                        nativeHistoryBiasView,
                         (VulkanGpuTextureView)resources.transparencyHintView,
                         inverseViewProjection, previousVp, clipToPrev,
                         lowWidth, lowHeight, jitterX, jitterY,
@@ -971,7 +935,6 @@ public final class DlssRenderer {
                     resources.depthDebugTexture,
                     resources.motionDebugTexture,
                     resources.motionValidityTexture,
-                    resources.historyBiasTexture,
                     resources.transparencyHintTexture
                 );
             }
@@ -1081,7 +1044,7 @@ public final class DlssRenderer {
                             : nisCommandBuffer.address(),
                         color.vkImage(), colorView.vkImageView(), depth.vkImage(), depthView.vkImageView(),
                         motion.vkImage(), nativeMotionView.vkImageView(),
-                        historyBias.vkImage(), nativeHistoryBiasView.vkImageView(),
+                        0L, 0L,
                         ((VulkanGpuTexture)resources.transparencyHintTexture).vkImage(), ((VulkanGpuTextureView)resources.transparencyHintView).vkImageView(),
                         output.vkImage(), nativeOutputView.vkImageView(),
                         sharpen.vkImage(), nativeSharpenView.vkImageView(), sharpness,
@@ -1444,91 +1407,12 @@ public final class DlssRenderer {
         }
     }
 
-    private static boolean activateMaterialSamplerGeneration(
-        VulkanDevice backend,
-        DlssMode mode
-    ) {
-        if (
-            mode == DlssMode.OFF
-                || lowWidth <= 0
-                || lowHeight <= 0
-                || outputWidth <= 0
-                || outputHeight <= 0
-        ) {
-            return DlssSamplerPolicy.deactivateGeneration(backend);
-        }
-        float delta = lodBiasForDimensions(
-            mode,
-            lowWidth,
-            lowHeight,
-            outputWidth,
-            outputHeight
-        );
-        return DlssSamplerPolicy.activateGeneration(
-            backend,
-            lowWidth,
-            lowHeight,
-            outputWidth,
-            outputHeight,
-            mode.nativeId(),
-            samplerPresetId(mode),
-            delta,
-            samplerReloadEpoch
-        );
-    }
-
-    static int samplerPresetId(DlssMode mode) {
-        return switch (mode) {
-            case QUALITY, BALANCED, DLAA -> 'K';
-            case PERFORMANCE -> 'M';
-            case ULTRA_PERFORMANCE -> 'L';
-            case OFF -> '-';
-        };
-    }
-
     private static float currentLodBiasForDimensions() {
-        return lodBiasForDimensions(
-            allocatedMode,
-            lowWidth,
-            lowHeight,
-            outputWidth,
-            outputHeight
-        );
-    }
-
-    /**
-     * NVIDIA's DLSS programming guide defines the texture LOD delta as
-     * {@code log2(renderWidth / displayWidth) - 1 + epsilon}. The actual
-     * SDK-selected render width and current framebuffer width are used, so
-     * windowed, maximized, fullscreen, and odd-sized viewports follow the
-     * same rule without a hard-coded output resolution. Native DLAA is an
-     * active DLSS quality mode with a 1:1 ratio and therefore receives a
-     * delta of -1; only DLSS OFF leaves the original sampler untouched.
-     * BlockFrame intentionally uses an epsilon of zero here; a non-zero,
-     * content-specific adjustment requires separate shimmer evidence.
-     *
-     * <p>This method returns the DLSS delta only. The sampler policy adds it
-     * exactly once to the captured native sampler bias and clamps the final
-     * value against the physical device's maxSamplerLodBias.</p>
-     */
-    static float lodBiasForDimensions(
-        DlssMode mode,
-        int renderWidth,
-        int renderHeight,
-        int displayWidth,
-        int displayHeight
-    ) {
-        if (
-            mode == DlssMode.OFF
-                || displayWidth <= 0
-                || displayHeight <= 0
-                || renderWidth <= 0
-                || renderHeight <= 0
-        ) {
-            return 0.0F;
-        }
-        double widthScale = (double)renderWidth / displayWidth;
-        return (float)(Math.log(widthScale) / Math.log(2.0D) - 1.0D);
+        // DLAA is native-resolution antialiasing and must never inherit the
+        // upscaling-specific bias, even if an SDK reports odd dimensions.
+        if (allocatedMode == DlssMode.DLAA) return 0.0F;
+        if (outputWidth <= 0 || lowWidth <= 0 || lowWidth == outputWidth) return 0.0F;
+        return Mth.clamp((float)(Math.log((double)lowWidth / outputWidth) / Math.log(2.0)) - 1.0F, -2.75F, 0.0F);
     }
 
     /** Complete per-frame integration facts, rendered after DLSS so the overlay itself stays native-resolution. */
@@ -2732,7 +2616,6 @@ public final class DlssRenderer {
         lowHeight = 0;
         outputWidth = 0;
         outputHeight = 0;
-        samplerReloadEpoch = 0L;
         allocatedMode = DlssMode.OFF;
         requestedMode = DlssMode.OFF;
         failedResourceMode = DlssMode.OFF;

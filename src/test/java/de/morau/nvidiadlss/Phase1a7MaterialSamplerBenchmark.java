@@ -47,7 +47,6 @@ public final class Phase1a7MaterialSamplerBenchmark {
         FAIL_ON_MISS =
             (
                 device,
-                descriptor,
                 u,
                 v,
                 min,
@@ -664,7 +663,6 @@ public final class Phase1a7MaterialSamplerBenchmark {
                         biases[index],
                         (
                             device,
-                            descriptor,
                             u,
                             v,
                             min,

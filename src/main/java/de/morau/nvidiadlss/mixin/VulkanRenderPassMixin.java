@@ -4,7 +4,6 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vulkan.VulkanBindGroupLayout;
@@ -18,11 +17,9 @@ import de.morau.blockframe.render.terrain.nativeengine
     .NativeTerrainIndirectRenderPass;
 import de.morau.nvidiadlss.DeveloperDiagnostics;
 import de.morau.nvidiadlss.DlssSamplerPolicy;
-import de.morau.nvidiadlss.DlssTerrainSamplerScope;
 import de.morau.nvidiadlss.FoliageAudit;
 import de.morau.nvidiadlss.NvidiaDlssMod;
 import java.util.HashMap;
-import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRPushDescriptor;
@@ -330,8 +327,10 @@ public abstract class VulkanRenderPassMixin
         }
         VulkanRenderPipeline activePipeline = this.pipeline;
         String textureLabel = textureView.texture().getLabel();
-        boolean blockAtlas =
-            DlssTerrainSamplerScope.isBlockAtlas(textureLabel);
+        boolean blockAtlas = nvidiaDlss$containsIgnoreCase(
+            textureLabel,
+            "blocks.png"
+        );
         if (blockAtlas) {
             this.nvidiaDlss$blockAtlasBinding = name;
             this.nvidiaDlss$blockAtlasView = textureView;
@@ -393,20 +392,17 @@ public abstract class VulkanRenderPassMixin
             if (activePipeline == null) {
                 return original;
             }
-            Identifier pipelineId =
-                activePipeline.info().getLocation();
-            if (
-                !DlssTerrainSamplerScope.eligible(
-                    pipelineId,
-                    nvidiaDlss$hasBlend(activePipeline)
-                )
-            ) {
-                return original;
-            }
+            String pipelinePath =
+                activePipeline.info().getLocation().getPath();
+            boolean cutoutTerrain =
+                pipelinePath.contains("cutout_terrain")
+                    || pipelinePath.contains(
+                        "native_terrain_cutout"
+                    );
             GpuSampler selected = DlssSamplerPolicy.materialSampler(
                 activePipeline.device(),
                 original,
-                DlssTerrainSamplerScope.isCutout(pipelineId)
+                cutoutTerrain
             );
             VulkanGpuSampler selectedVulkan =
                 selected instanceof VulkanGpuSampler vulkanSampler
@@ -443,18 +439,23 @@ public abstract class VulkanRenderPassMixin
     }
 
     @Unique
-    private static boolean nvidiaDlss$hasBlend(
-        VulkanRenderPipeline pipeline
+    private static boolean nvidiaDlss$containsIgnoreCase(
+        String value,
+        String expected
     ) {
-        ColorTargetState[] colorTargets =
-            pipeline.info().getColorTargetStates();
-        if (colorTargets == null || colorTargets.length == 0) {
-            return true;
+        if (value == null || expected == null) {
+            return false;
         }
-        for (ColorTargetState colorTarget : colorTargets) {
+        int limit = value.length() - expected.length();
+        for (int index = 0; index <= limit; index++) {
             if (
-                colorTarget != null
-                    && colorTarget.blendFunction().isPresent()
+                value.regionMatches(
+                    true,
+                    index,
+                    expected,
+                    0,
+                    expected.length()
+                )
             ) {
                 return true;
             }

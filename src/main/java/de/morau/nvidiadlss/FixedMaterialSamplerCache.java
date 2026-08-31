@@ -25,7 +25,6 @@ final class FixedMaterialSamplerCache {
     private final Object device;
     private final LeaseController leases;
     private final ShaderResourceInventory inventory;
-    private final Object[] samplerDescriptors;
     private final Object[] addressModesU;
     private final Object[] addressModesV;
     private final Object[] minFilters;
@@ -73,7 +72,6 @@ final class FixedMaterialSamplerCache {
         this.maxEntries = capacity;
         int tableCapacity = tableCapacity(capacity);
         this.tableMask = tableCapacity - 1;
-        this.samplerDescriptors = new Object[tableCapacity];
         this.addressModesU = new Object[tableCapacity];
         this.addressModesV = new Object[tableCapacity];
         this.minFilters = new Object[tableCapacity];
@@ -98,39 +96,7 @@ final class FixedMaterialSamplerCache {
         SamplerFactory factory,
         SamplerObserver observer
     ) {
-        return select(
-            original,
-            original,
-            addressModeU,
-            addressModeV,
-            minFilter,
-            magFilter,
-            anisotropy,
-            maxLod,
-            bias,
-            factory,
-            observer
-        );
-    }
-
-    Object select(
-        Object original,
-        Object samplerDescriptor,
-        Object addressModeU,
-        Object addressModeV,
-        Object minFilter,
-        Object magFilter,
-        int anisotropy,
-        OptionalDouble maxLod,
-        float bias,
-        SamplerFactory factory,
-        SamplerObserver observer
-    ) {
         Objects.requireNonNull(original, "original");
-        Objects.requireNonNull(
-            samplerDescriptor,
-            "samplerDescriptor"
-        );
         Objects.requireNonNull(addressModeU, "addressModeU");
         Objects.requireNonNull(addressModeV, "addressModeV");
         Objects.requireNonNull(minFilter, "minFilter");
@@ -149,14 +115,13 @@ final class FixedMaterialSamplerCache {
         long lodBits = hasMaxLod
             ? Double.doubleToLongBits(maxLod.getAsDouble())
             : Long.MIN_VALUE;
-        int requestedBiasBits = Float.floatToRawIntBits(bias);
+        int requestedBiasBits = Float.floatToIntBits(bias);
 
         int fastSlot = this.lastLookupSlot;
         if (
             fastSlot >= 0
                 && matches(
                     fastSlot,
-                    samplerDescriptor,
                     addressModeU,
                     addressModeV,
                     minFilter,
@@ -173,7 +138,6 @@ final class FixedMaterialSamplerCache {
         }
 
         int slot = keyHash(
-            samplerDescriptor,
             addressModeU,
             addressModeV,
             minFilter,
@@ -187,7 +151,6 @@ final class FixedMaterialSamplerCache {
             if (
                 matches(
                     slot,
-                    samplerDescriptor,
                     addressModeU,
                     addressModeV,
                     minFilter,
@@ -211,7 +174,6 @@ final class FixedMaterialSamplerCache {
         }
 
         this.slotCount++;
-        this.samplerDescriptors[slot] = samplerDescriptor;
         this.addressModesU[slot] = addressModeU;
         this.addressModesV[slot] = addressModeV;
         this.minFilters[slot] = minFilter;
@@ -226,7 +188,6 @@ final class FixedMaterialSamplerCache {
         try {
             created = factory.create(
                 this.device,
-                samplerDescriptor,
                 addressModeU,
                 addressModeV,
                 minFilter,
@@ -392,27 +353,6 @@ final class FixedMaterialSamplerCache {
     }
 
     boolean finishDeviceCloseAfterEncoderDrain() {
-        return finishRetirement("closed after encoder drain");
-    }
-
-    /**
-     * Releases only this cache's Java lookup metadata after every live
-     * sampler was successfully transferred to Mojang's destruction queue.
-     *
-     * <p>{@code VulkanGpuSampler.close()} keeps the sampler itself strongly
-     * reachable in {@code VulkanCommandEncoder}'s two-submit destruction
-     * queue. Clearing these lookup arrays therefore cannot destroy the raw
-     * sampler early. The lease and resource inventory remain in their
-     * independent three-frame retirement rings until the queue window has
-     * elapsed.</p>
-     */
-    boolean releaseReferencesAfterQueueTransfer() {
-        return finishRetirement(
-            "retired after confirmed destruction-queue transfer"
-        );
-    }
-
-    private boolean finishRetirement(String completedState) {
         if (this.finished) {
             return true;
         }
@@ -420,7 +360,6 @@ final class FixedMaterialSamplerCache {
             return false;
         }
         Arrays.fill(this.samplers, null);
-        Arrays.fill(this.samplerDescriptors, null);
         Arrays.fill(this.addressModesU, null);
         Arrays.fill(this.addressModesV, null);
         Arrays.fill(this.minFilters, null);
@@ -429,7 +368,7 @@ final class FixedMaterialSamplerCache {
         this.slotCount = 0;
         this.lastLookupSlot = -1;
         this.finished = true;
-        this.state = completedState;
+        this.state = "closed after encoder drain";
         return true;
     }
 
@@ -512,7 +451,6 @@ final class FixedMaterialSamplerCache {
     }
 
     private static int keyHash(
-        Object samplerDescriptor,
         Object addressModeU,
         Object addressModeV,
         Object minFilter,
@@ -522,8 +460,7 @@ final class FixedMaterialSamplerCache {
         long lodBits,
         int requestedBiasBits
     ) {
-        int hash = samplerDescriptor.hashCode();
-        hash = 31 * hash + System.identityHashCode(addressModeU);
+        int hash = System.identityHashCode(addressModeU);
         hash = 31 * hash + System.identityHashCode(addressModeV);
         hash = 31 * hash + System.identityHashCode(minFilter);
         hash = 31 * hash + System.identityHashCode(magFilter);
@@ -537,7 +474,6 @@ final class FixedMaterialSamplerCache {
 
     private boolean matches(
         int slot,
-        Object samplerDescriptor,
         Object addressModeU,
         Object addressModeV,
         Object minFilter,
@@ -547,12 +483,7 @@ final class FixedMaterialSamplerCache {
         long lodBits,
         int requestedBiasBits
     ) {
-        Object cachedDescriptor = this.samplerDescriptors[slot];
-        return (
-                cachedDescriptor == samplerDescriptor
-                    || cachedDescriptor.equals(samplerDescriptor)
-            )
-            && this.biasBits[slot] == requestedBiasBits
+        return this.biasBits[slot] == requestedBiasBits
             && this.maxAnisotropy[slot] == anisotropy
             && this.maxLodPresent[slot] == hasMaxLod
             && this.maxLodBits[slot] == lodBits
@@ -566,7 +497,6 @@ final class FixedMaterialSamplerCache {
     interface SamplerFactory {
         Object create(
             Object device,
-            Object samplerDescriptor,
             Object addressModeU,
             Object addressModeV,
             Object minFilter,

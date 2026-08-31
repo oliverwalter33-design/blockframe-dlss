@@ -11,8 +11,8 @@ class DlssResourceFootprintTest {
         DlssResourceFootprint footprint =
             DlssResourceFootprint.forDimensions(1, 1, 1, 1, false);
 
-        assertEquals(28L, footprint.requestedBytes());
-        assertEquals(458_752L, footprint.committedBytes());
+        assertEquals(24L, footprint.requestedBytes());
+        assertEquals(393_216L, footprint.committedBytes());
     }
 
     @Test
@@ -26,8 +26,8 @@ class DlssResourceFootprintTest {
                 false
             );
 
-        assertEquals(140_083_200L, footprint.requestedBytes());
-        assertEquals(140_181_504L, footprint.committedBytes());
+        assertEquals(125_337_600L, footprint.requestedBytes());
+        assertEquals(125_435_904L, footprint.committedBytes());
     }
 
     @Test
@@ -41,8 +41,8 @@ class DlssResourceFootprintTest {
                 true
             );
 
-        assertEquals(173_260_800L, footprint.requestedBytes());
-        assertEquals(173_408_256L, footprint.committedBytes());
+        assertEquals(158_515_200L, footprint.requestedBytes());
+        assertEquals(158_662_656L, footprint.committedBytes());
     }
 
     @Test

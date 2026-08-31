@@ -48,6 +48,7 @@ class StreamlineBootstrapSourceContractTest {
                 "gIsFeatureSupported",
                 "gGetFeatureFunction",
                 "gGetNewFrameToken",
+                "gSetTagForFrame",
                 "gSetConstants",
                 "gEvaluateFeature",
                 "gFreeResources",

@@ -44,14 +44,10 @@ public final class NvidiaDlssMod {
             dlss.sharpeningAmount(),
             dlss.entityHistoryBackend().id()
         );
-        boolean sodiumPresent =
-            DlssMixinPlugin.sodiumPresent() || ModList.get().isLoaded("sodium");
         if (developerDiagnostics) {
             modBus.addListener(NvidiaDlssMod::registerGuiLayers);
         }
-        if (!sodiumPresent) {
-            modBus.addListener(NativeTerrainPipelines::register);
-        }
+        modBus.addListener(NativeTerrainPipelines::register);
         if (developerDiagnostics) {
             modBus.addListener(NvidiaDlssMod::onLoadComplete);
         }
@@ -85,6 +81,8 @@ public final class NvidiaDlssMod {
         );
         NeoForge.EVENT_BUS.addListener(NvidiaDlssMod::onClientStopping);
         NeoForge.EVENT_BUS.addListener(NvidiaDlssMod::onClientStopped);
+        boolean sodiumPresent =
+            DlssMixinPlugin.sodiumPresent() || ModList.get().isLoaded("sodium");
         if (sodiumPresent) {
             LOGGER.info(
                 "Sodium detected: Sodium remains terrain owner; "

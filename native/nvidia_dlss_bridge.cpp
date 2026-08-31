@@ -50,6 +50,7 @@ PFun_slSetVulkanInfo* gSetVulkanInfo{};
 PFun_slIsFeatureSupported* gIsFeatureSupported{};
 PFun_slGetFeatureFunction* gGetFeatureFunction{};
 PFun_slGetNewFrameToken* gGetNewFrameToken{};
+PFun_slSetTagForFrame* gSetTagForFrame{};
 PFun_slSetConstants* gSetConstants{};
 PFun_slEvaluateFeature* gEvaluateFeature{};
 PFun_slFreeResources* gFreeResources{};
@@ -158,6 +159,7 @@ void clearResolvedFunctions() {
     gIsFeatureSupported = nullptr;
     gGetFeatureFunction = nullptr;
     gGetNewFrameToken = nullptr;
+    gSetTagForFrame = nullptr;
     gSetConstants = nullptr;
     gEvaluateFeature = nullptr;
     gFreeResources = nullptr;
@@ -775,12 +777,13 @@ extern "C" JNIEXPORT jint JNICALL Java_de_morau_nvidiadlss_nativebridge_NativeSt
     gIsFeatureSupported = resolve<PFun_slIsFeatureSupported>("slIsFeatureSupported");
     gGetFeatureFunction = resolve<PFun_slGetFeatureFunction>("slGetFeatureFunction");
     gGetNewFrameToken = resolve<PFun_slGetNewFrameToken>("slGetNewFrameToken");
+    gSetTagForFrame = resolve<PFun_slSetTagForFrame>("slSetTagForFrame");
     gSetConstants = resolve<PFun_slSetConstants>("slSetConstants");
     gEvaluateFeature = resolve<PFun_slEvaluateFeature>("slEvaluateFeature");
     gFreeResources = resolve<PFun_slFreeResources>("slFreeResources");
     gGetDeviceProcAddrProxy = reinterpret_cast<PFN_vkGetDeviceProcAddr>(GetProcAddress(gModule, "vkGetDeviceProcAddr"));
     if (!gInit || !gShutdown || !gGetRequirements || !gSetVulkanInfo || !gIsFeatureSupported ||
-        !gGetFeatureFunction || !gGetNewFrameToken || !gSetConstants || !gEvaluateFeature ||
+        !gGetFeatureFunction || !gGetNewFrameToken || !gSetTagForFrame || !gSetConstants || !gEvaluateFeature ||
         !gFreeResources || !gGetDeviceProcAddrProxy) {
         setOperationMessage("Die Streamline-Exports sind unvollständig");
         return rollbackFailedBootstrap(-1001);
@@ -927,6 +930,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_de_morau_nvidiadlss_nativebridge_NativeS
    jfloat forwardX, jfloat forwardY, jfloat forwardZ,
     jfloat nearPlane, jfloat farPlane, jfloat fov, jfloat aspect,
      jfloat jitterX, jfloat jitterY, jint auditHintMode, jboolean reset) {
+    // Kept in the JNI ABI for compatibility with already compiled Java callers.
+    // These resources are deliberately not exposed to Streamline.
+    static_cast<void>(historyBiasImage);
+    static_cast<void>(historyBiasView);
     if (!gInitialized || !gSetOptions) {
         return packEvaluationResults(-1200, kNisNotRequested);
     }
@@ -979,8 +986,6 @@ extern "C" JNIEXPORT jlong JNICALL Java_de_morau_nvidiadlss_nativebridge_NativeS
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     sl::Resource motion = makeImage(motionImage, motionView, inputWidth, inputHeight, VK_FORMAT_R16G16_SFLOAT,
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
-    sl::Resource historyBias = makeImage(historyBiasImage, historyBiasView, inputWidth, inputHeight, VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
     sl::Resource transparencyHint = makeImage(transparencyHintImage, transparencyHintView, inputWidth, inputHeight, VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
     sl::Resource output = makeImage(outputImage, outputView, outputWidth, outputHeight, VK_FORMAT_R8G8B8A8_UNORM,
@@ -993,52 +998,34 @@ extern "C" JNIEXPORT jlong JNICALL Java_de_morau_nvidiadlss_nativebridge_NativeS
     // Only mode 1 explicitly enables the supported transparency input. Every
     // other value fails closed so legacy diagnostic modes cannot retag it.
     const bool includeTransparencyHint = auditHintMode == 1;
-    const char* temporalHintName = includeTransparencyHint
-        ? "BiasCurrentColorHint(local-player)+TransparencyHint"
-        : "BiasCurrentColorHint(local-player)";
+    const char* temporalHintName = includeTransparencyHint ? "TransparencyHint" : "None";
     sl::ResourceTag tagsWithTransparency[] = {
-        {&color, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&depth, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&motion, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&historyBias, sl::kBufferTypeBiasCurrentColorHint, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&transparencyHint, sl::kBufferTypeTransparencyHint, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilEvaluate, &outputExtent}
+        {&color, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eOnlyValidNow, &inputExtent},
+        {&depth, sl::kBufferTypeDepth, sl::ResourceLifecycle::eOnlyValidNow, &inputExtent},
+        {&motion, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eOnlyValidNow, &inputExtent},
+        {&transparencyHint, sl::kBufferTypeTransparencyHint, sl::ResourceLifecycle::eOnlyValidNow, &inputExtent},
+        {&output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eOnlyValidNow, &outputExtent}
     };
     sl::ResourceTag tagsWithoutTransparency[] = {
-        {&color, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&depth, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&motion, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&historyBias, sl::kBufferTypeBiasCurrentColorHint, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent},
-        {&output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilEvaluate, &outputExtent}
+        {&color, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eOnlyValidNow, &inputExtent},
+        {&depth, sl::kBufferTypeDepth, sl::ResourceLifecycle::eOnlyValidNow, &inputExtent},
+        {&motion, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eOnlyValidNow, &inputExtent},
+        {&output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eOnlyValidNow, &outputExtent}
     };
-    const sl::BaseStructure* inputsWithTransparency[] = {
-        &viewport,
-        &tagsWithTransparency[0],
-        &tagsWithTransparency[1],
-        &tagsWithTransparency[2],
-        &tagsWithTransparency[3],
-        &tagsWithTransparency[4],
-        &tagsWithTransparency[5]
-    };
-    const sl::BaseStructure* inputsWithoutTransparency[] = {
-        &viewport,
-        &tagsWithoutTransparency[0],
-        &tagsWithoutTransparency[1],
-        &tagsWithoutTransparency[2],
-        &tagsWithoutTransparency[3],
-        &tagsWithoutTransparency[4]
-    };
-    const sl::BaseStructure** dlssInputs = includeTransparencyHint
-        ? inputsWithTransparency
-        : inputsWithoutTransparency;
-    const uint32_t dlssInputCount = includeTransparencyHint ? 7u : 6u;
+    const sl::Result tagResult = includeTransparencyHint
+        ? gSetTagForFrame(*token, viewport, tagsWithTransparency, 5, dlssCmd)
+        : gSetTagForFrame(*token, viewport, tagsWithoutTransparency, 4, dlssCmd);
+    if (!ok(tagResult, "DLSS-Ressourcen")) {
+        return packEvaluationResults(-1203, kNisNotRequested);
+    }
     if (!ok(gSetConstants(constants, *token, viewport), "DLSS-Kameradaten")) {
         return packEvaluationResults(-1204, kNisNotRequested);
     }
+    const sl::BaseStructure* inputs[] = {&viewport};
     const sl::Result result = gEvaluateFeature(sl::kFeatureDLSS,
         *token,
-        dlssInputs,
-        dlssInputCount,
+        inputs,
+        1,
         dlssCmd
     );
     const bool dlssSucceeded = ok(result, "DLSS-Auswertung");
@@ -1079,18 +1066,16 @@ extern "C" JNIEXPORT jlong JNICALL Java_de_morau_nvidiadlss_nativebridge_NativeS
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
         sl::ResourceTag nisTags[] = {
-            {&output, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilEvaluate, &outputExtent},
-            {&sharpen, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilEvaluate, &outputExtent}
+            {&output, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eOnlyValidNow, &outputExtent},
+            {&sharpen, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eOnlyValidNow, &outputExtent}
         };
-        const sl::BaseStructure* nisInputs[] = {
-            &viewport,
-            &nisTags[0],
-            &nisTags[1]
-        };
+        if (!ok(gSetTagForFrame(*token, viewport, nisTags, 2, nisCmd), "NIS-NVSharpen-Ressourcen")) {
+            return packEvaluationResults(0, -1212);
+        }
         const sl::Result nisResult = gEvaluateFeature(sl::kFeatureNIS,
             *token,
-            nisInputs,
-            3,
+            inputs,
+            1,
             nisCmd
         );
         const bool nisSucceeded = ok(

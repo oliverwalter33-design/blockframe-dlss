@@ -11,7 +11,6 @@ import static de.morau.blockframe.vulkan.DlssVulkanCapabilityNegotiator.NVX_BINA
 import static de.morau.blockframe.vulkan.DlssVulkanCapabilityNegotiator.NVX_IMAGE_VIEW_HANDLE;
 import static de.morau.blockframe.vulkan.DlssVulkanCapabilityNegotiator.PUSH_DESCRIPTOR;
 import static de.morau.blockframe.vulkan.DlssVulkanCapabilityNegotiator.SHADER_FLOAT16_FEATURE;
-import static de.morau.blockframe.vulkan.DlssVulkanCapabilityNegotiator.SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE;
 import static de.morau.blockframe.vulkan.DlssVulkanCapabilityNegotiator.TIMELINE_SEMAPHORE_FEATURE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,19 +21,6 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class DlssVulkanCapabilityNegotiatorTest {
-    @Test
-    void runtimeCandidateSetKeepsBothBdaNamesForPre12Negotiation() {
-        assertTrue(
-            DlssVulkanCapabilityNegotiator.DEVICE_EXTENSION_CANDIDATES
-                .containsAll(
-                    Set.of(
-                        EXT_BUFFER_DEVICE_ADDRESS,
-                        KHR_BUFFER_DEVICE_ADDRESS
-                    )
-                )
-        );
-    }
-
     @Test
     void vulkan12CorePromotionAvoidsEnablingPromotedInstanceNames() {
         var requirements = union(
@@ -77,7 +63,7 @@ class DlssVulkanCapabilityNegotiatorTest {
     }
 
     @Test
-    void vulkan12CoreBdaSuppressesBothExtensionNamesWhenAdvertised() {
+    void exactDlssNisUnionKeepsExtBdaAndPromotesOnlyKhrAlias() {
         var requirements = union(
             Set.of(),
             Set.of(
@@ -110,7 +96,6 @@ class DlssVulkanCapabilityNegotiatorTest {
                     true,
                     true,
                     true,
-                    true,
                     true
                 ),
                 requirements,
@@ -130,11 +115,12 @@ class DlssVulkanCapabilityNegotiatorTest {
             Set.of(
                 PUSH_DESCRIPTOR,
                 NVX_BINARY_IMPORT,
-                NVX_IMAGE_VIEW_HANDLE
+                NVX_IMAGE_VIEW_HANDLE,
+                EXT_BUFFER_DEVICE_ADDRESS
             ),
             device.enabledExtensions()
         );
-        assertFalse(
+        assertTrue(
             device.enabledExtensions().contains(EXT_BUFFER_DEVICE_ADDRESS)
         );
         assertFalse(
@@ -142,21 +128,10 @@ class DlssVulkanCapabilityNegotiatorTest {
         );
         assertEquals(
             Set.of(
-                EXT_BUFFER_DEVICE_ADDRESS,
-                KHR_BUFFER_DEVICE_ADDRESS,
-                EXT_DESCRIPTOR_INDEXING,
-                KHR_TIMELINE_SEMAPHORE,
-                KHR_SHADER_FLOAT16_INT8
-            ),
-            device.coreSatisfiedExtensions()
-        );
-        assertEquals(
-            Set.of(
                 TIMELINE_SEMAPHORE_FEATURE,
                 DESCRIPTOR_INDEXING_FEATURE,
                 BUFFER_DEVICE_ADDRESS_FEATURE,
-                SHADER_FLOAT16_FEATURE,
-                SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE
+                SHADER_FLOAT16_FEATURE
             ),
             device.enabledFeatures()
         );
@@ -166,149 +141,6 @@ class DlssVulkanCapabilityNegotiatorTest {
             DlssVulkanCapabilityNegotiator.CapabilityStatus
                 .RUNTIME_REQUIREMENTS_MET,
             report.status()
-        );
-    }
-
-    @Test
-    void vulkan12CoreSatisfiesActualStreamlineExtBdaRequirement() {
-        var requirements = union(
-            Set.of(),
-            Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-            Set.of(BUFFER_DEVICE_ADDRESS_FEATURE)
-        );
-
-        var device =
-            DlssVulkanCapabilityNegotiator.selectDeviceCapabilities(
-                Set.of(
-                    EXT_BUFFER_DEVICE_ADDRESS,
-                    KHR_BUFFER_DEVICE_ADDRESS
-                ),
-                new DlssVulkanCapabilityNegotiator.DeviceFeatureSupport(
-                    true,
-                    true,
-                    true,
-                    true,
-                    true
-                ),
-                requirements,
-                DlssVulkanCapabilityNegotiator.VULKAN_API_1_2
-            );
-
-        assertTrue(device.complete());
-        assertTrue(device.enabledExtensions().isEmpty());
-        assertEquals(
-            Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-            device.coreSatisfiedExtensions()
-        );
-        assertEquals(
-            Set.of(
-                BUFFER_DEVICE_ADDRESS_FEATURE,
-                SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE
-            ),
-            device.enabledFeatures()
-        );
-    }
-
-    @Test
-    void vulkan11SelectsTheExactAdvertisedBdaExtensionWithoutCoreFeatures() {
-        var extSelection =
-            DlssVulkanCapabilityNegotiator.selectDeviceCapabilities(
-                Set.of(
-                    EXT_BUFFER_DEVICE_ADDRESS,
-                    KHR_BUFFER_DEVICE_ADDRESS
-                ),
-                supportedFeatures(),
-                union(
-                    Set.of(),
-                    Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-                    Set.of()
-                ),
-                DlssVulkanCapabilityNegotiator.VULKAN_API_1_1
-            );
-        var khrSelection =
-            DlssVulkanCapabilityNegotiator.selectDeviceCapabilities(
-                Set.of(
-                    EXT_BUFFER_DEVICE_ADDRESS,
-                    KHR_BUFFER_DEVICE_ADDRESS
-                ),
-                supportedFeatures(),
-                union(
-                    Set.of(),
-                    Set.of(KHR_BUFFER_DEVICE_ADDRESS),
-                    Set.of()
-                ),
-                DlssVulkanCapabilityNegotiator.VULKAN_API_1_1
-            );
-        var wrongAliasOnly =
-            DlssVulkanCapabilityNegotiator.selectDeviceCapabilities(
-                Set.of(KHR_BUFFER_DEVICE_ADDRESS),
-                supportedFeatures(),
-                union(
-                    Set.of(),
-                    Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-                    Set.of()
-                ),
-                DlssVulkanCapabilityNegotiator.VULKAN_API_1_1
-            );
-
-        assertTrue(extSelection.complete());
-        assertEquals(
-            Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-            extSelection.enabledExtensions()
-        );
-        assertTrue(khrSelection.complete());
-        assertEquals(
-            Set.of(KHR_BUFFER_DEVICE_ADDRESS),
-            khrSelection.enabledExtensions()
-        );
-        assertFalse(wrongAliasOnly.complete());
-        assertTrue(wrongAliasOnly.enabledExtensions().isEmpty());
-        assertEquals(
-            Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-            wrongAliasOnly.missingExtensions()
-        );
-    }
-
-    @Test
-    void vulkan11StreamlineVulkan12FeaturePathFailsClosed() {
-        var requirements = union(
-            Set.of(),
-            Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-            Set.of(BUFFER_DEVICE_ADDRESS_FEATURE)
-        );
-
-        var device =
-            DlssVulkanCapabilityNegotiator.selectDeviceCapabilities(
-                Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-                supportedFeatures(),
-                requirements,
-                DlssVulkanCapabilityNegotiator.VULKAN_API_1_1
-            );
-
-        assertFalse(device.complete());
-        assertEquals(
-            Set.of(EXT_BUFFER_DEVICE_ADDRESS),
-            device.enabledExtensions()
-        );
-        assertEquals(
-            Set.of(
-                SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE
-            ),
-            device.enabledFeatures()
-        );
-        assertEquals(
-            Set.of(BUFFER_DEVICE_ADDRESS_FEATURE),
-            device.missingFeatures()
-        );
-        assertFalse(
-            DlssVulkanCapabilityNegotiator.report(
-                new DlssVulkanCapabilityNegotiator.InstanceSelection(
-                    Set.of(),
-                    Set.of(),
-                    Set.of()
-                ),
-                device
-            ).safeToEnableStaticRequirements()
         );
     }
 
@@ -326,8 +158,7 @@ class DlssVulkanCapabilityNegotiatorTest {
                     true,
                     true,
                     true,
-                    false,
-                    true
+                    false
                 ),
                 requirements,
                 DlssVulkanCapabilityNegotiator.VULKAN_API_1_2
@@ -345,55 +176,6 @@ class DlssVulkanCapabilityNegotiatorTest {
     }
 
     @Test
-    void missingStreamlineStorageImageWriteFeatureFailsClosed() {
-        var requirements = union(Set.of(), Set.of(), Set.of());
-        var device =
-            DlssVulkanCapabilityNegotiator.selectDeviceCapabilities(
-                Set.of(),
-                new DlssVulkanCapabilityNegotiator.DeviceFeatureSupport(
-                    true,
-                    true,
-                    true,
-                    true,
-                    false
-                ),
-                requirements,
-                DlssVulkanCapabilityNegotiator.VULKAN_API_1_2
-            );
-
-        assertFalse(device.complete());
-        assertTrue(device.enabledFeatures().isEmpty());
-        assertEquals(
-            Set.of(
-                SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE
-            ),
-            device.missingFeatures()
-        );
-        assertFalse(
-            DlssVulkanCapabilityNegotiator.report(
-                new DlssVulkanCapabilityNegotiator.InstanceSelection(
-                    Set.of(),
-                    Set.of(),
-                    Set.of()
-                ),
-                device
-            ).safeToEnableStaticRequirements()
-        );
-        assertTrue(
-            DlssVulkanCapabilityNegotiator.report(
-                new DlssVulkanCapabilityNegotiator.InstanceSelection(
-                    Set.of(),
-                    Set.of(),
-                    Set.of()
-                ),
-                device
-            ).reason().contains(
-                SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE
-            )
-        );
-    }
-
-    @Test
     void unknownVulkanFeatureNameIsNeverInferred() {
         var requirements = union(
             Set.of(),
@@ -404,7 +186,6 @@ class DlssVulkanCapabilityNegotiatorTest {
             DlssVulkanCapabilityNegotiator.selectDeviceCapabilities(
                 Set.of(),
                 new DlssVulkanCapabilityNegotiator.DeviceFeatureSupport(
-                    true,
                     true,
                     true,
                     true,
@@ -431,17 +212,6 @@ class DlssVulkanCapabilityNegotiatorTest {
             deviceExtensions,
             features12,
             Set.of()
-        );
-    }
-
-    private static DlssVulkanCapabilityNegotiator.DeviceFeatureSupport
-        supportedFeatures() {
-        return new DlssVulkanCapabilityNegotiator.DeviceFeatureSupport(
-            true,
-            true,
-            true,
-            true,
-            true
         );
     }
 }

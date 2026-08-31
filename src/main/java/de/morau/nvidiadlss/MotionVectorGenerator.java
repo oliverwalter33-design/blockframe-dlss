@@ -52,19 +52,19 @@ import org.lwjgl.vulkan.VkWriteDescriptorSet;
 public final class MotionVectorGenerator implements AutoCloseable {
     public static final int MAX_OBJECTS = 64;
     private static final int FRAME_RING_SIZE = 3;
-    static final int RELEASE_DESCRIPTOR_BINDING_COUNT = 6;
-    static final int DIAGNOSTIC_DESCRIPTOR_BINDING_COUNT = 9;
+    static final int RELEASE_DESCRIPTOR_BINDING_COUNT = 5;
+    static final int DIAGNOSTIC_DESCRIPTOR_BINDING_COUNT = 8;
     static final int COMBINED_IMAGE_DESCRIPTORS = FRAME_RING_SIZE * 2;
     static final int RELEASE_STORAGE_IMAGE_DESCRIPTORS =
-        FRAME_RING_SIZE * 3;
+        FRAME_RING_SIZE * 2;
     static final int DIAGNOSTIC_STORAGE_IMAGE_DESCRIPTORS =
-        FRAME_RING_SIZE * 6;
+        FRAME_RING_SIZE * 5;
     static final int UNIFORM_BUFFER_DESCRIPTORS = FRAME_RING_SIZE;
     static final int DESCRIPTOR_COUNT =
         COMBINED_IMAGE_DESCRIPTORS
             + DIAGNOSTIC_STORAGE_IMAGE_DESCRIPTORS
             + UNIFORM_BUFFER_DESCRIPTORS;
-    private static final int HEADER_FLOATS = 72;
+    private static final int HEADER_FLOATS = 68;
     private static final int OBJECT_FLOATS = 20;
     private static final int UNIFORM_BYTES = (
         HEADER_FLOATS
@@ -180,9 +180,9 @@ public final class MotionVectorGenerator implements AutoCloseable {
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 LongBuffer handle = stack.callocLong(1);
 
-                int descriptorBindingCount = descriptorBindingCount(
-                    this.developerDiagnostics
-                );
+                int descriptorBindingCount = this.developerDiagnostics
+                    ? DIAGNOSTIC_DESCRIPTOR_BINDING_COUNT
+                    : RELEASE_DESCRIPTOR_BINDING_COUNT;
                 VkDescriptorSetLayoutBinding.Buffer bindings =
                     VkDescriptorSetLayoutBinding.calloc(
                         descriptorBindingCount,
@@ -194,14 +194,12 @@ public final class MotionVectorGenerator implements AutoCloseable {
                 if (this.developerDiagnostics) {
                     descriptorBinding(bindings.get(3), 4, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
                     descriptorBinding(bindings.get(4), 5, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-                    descriptorBinding(bindings.get(5), 6, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-                    descriptorBinding(bindings.get(6), 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-                    descriptorBinding(bindings.get(7), 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-                    descriptorBinding(bindings.get(8), 9, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+                    descriptorBinding(bindings.get(5), 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+                    descriptorBinding(bindings.get(6), 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    descriptorBinding(bindings.get(7), 9, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
                 } else {
-                    descriptorBinding(bindings.get(3), 6, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-                    descriptorBinding(bindings.get(4), 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-                    descriptorBinding(bindings.get(5), 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    descriptorBinding(bindings.get(3), 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+                    descriptorBinding(bindings.get(4), 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
                 }
                 VkDescriptorSetLayoutCreateInfo setLayoutInfo = VkDescriptorSetLayoutCreateInfo.calloc(stack).sType$Default().pBindings(bindings);
                 handle.put(0, 0L);
@@ -401,10 +399,8 @@ public final class MotionVectorGenerator implements AutoCloseable {
                     );
                     this.inventory.created(
                         ResourceKind.DESCRIPTOR,
-                        descriptorSlotsForSets(
-                            allocatedDescriptorSets,
-                            this.developerDiagnostics
-                        )
+                        allocatedDescriptorSets
+                            * descriptorBindingCount
                     );
                 }
                 if (allocatedDescriptorSets != FRAME_RING_SIZE) {
@@ -474,7 +470,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
         VulkanGpuTextureView depthDebugOutput,
         VulkanGpuTextureView motionDebugOutput,
         VulkanGpuTextureView motionValidityOutput,
-        VulkanGpuTextureView historyBiasOutput,
         VulkanGpuTextureView transparencyHintOutput,
         Matrix4f inverseCurrentViewProjection,
         Matrix4f previousViewProjection,
@@ -495,7 +490,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
             depthDebugOutput,
             motionDebugOutput,
             motionValidityOutput,
-            historyBiasOutput,
             transparencyHintOutput,
             inverseCurrentViewProjection,
             previousViewProjection,
@@ -519,7 +513,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
         VulkanGpuTextureView depthDebugOutput,
         VulkanGpuTextureView motionDebugOutput,
         VulkanGpuTextureView motionValidityOutput,
-        VulkanGpuTextureView historyBiasOutput,
         VulkanGpuTextureView transparencyHintOutput,
         Matrix4f inverseCurrentViewProjection,
         Matrix4f previousViewProjection,
@@ -540,7 +533,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
             depthDebugOutput,
             motionDebugOutput,
             motionValidityOutput,
-            historyBiasOutput,
             transparencyHintOutput,
             inverseCurrentViewProjection,
             previousViewProjection,
@@ -564,7 +556,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
         VulkanGpuTextureView depthDebugOutput,
         VulkanGpuTextureView motionDebugOutput,
         VulkanGpuTextureView motionValidityOutput,
-        VulkanGpuTextureView historyBiasOutput,
         VulkanGpuTextureView transparencyHintOutput,
         Matrix4f inverseCurrentViewProjection,
         Matrix4f previousViewProjection,
@@ -597,7 +588,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
                 depthDebugOutput,
                 motionDebugOutput,
                 motionValidityOutput,
-                historyBiasOutput,
                 transparencyHintOutput
             );
         } else {
@@ -606,7 +596,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
                 currentColor,
                 currentDepth,
                 motionOutput,
-                historyBiasOutput,
                 transparencyHintOutput
             );
         }
@@ -685,13 +674,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
         }
         ThirdPersonGeometryBatch articulated =
             ThirdPersonGeometryMotion.dispatchBatch();
-        articulated.prepareHistoryRejectRects(
-            inverseCurrentViewProjection,
-            previousViewProjection,
-            width,
-            height,
-            reset
-        );
         try (GpuBufferSlice.MappedView mapped = buffer.map(false, true)) {
             ByteBuffer bytes = mapped.data().order(ByteOrder.nativeOrder());
             bytes.clear();
@@ -717,10 +699,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
                 .putInt(articulated.overflow() ? 1 : 0)
                 .putInt(0)
                 .putInt(0);
-            bytes.putFloat(articulated.historyMinU())
-                .putFloat(articulated.historyMinV())
-                .putFloat(articulated.historyMaxU())
-                .putFloat(articulated.historyMaxV());
             if (batch != null) {
                 for (int i = 0; i < count; i++) {
                     batch.writeObject(i, bytes);
@@ -744,7 +722,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
         VulkanGpuTextureView currentColor,
         VulkanGpuTextureView currentDepth,
         VulkanGpuTextureView motionOutput,
-        VulkanGpuTextureView historyBiasOutput,
         VulkanGpuTextureView transparencyHintOutput
     ) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -752,8 +729,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
                 .sampler(this.sampler).imageView(currentDepth.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
             VkDescriptorImageInfo.Buffer motionInfo = VkDescriptorImageInfo.calloc(1, stack)
                 .sampler(0L).imageView(motionOutput.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
-            VkDescriptorImageInfo.Buffer historyBiasInfo = VkDescriptorImageInfo.calloc(1, stack)
-                .sampler(0L).imageView(historyBiasOutput.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
             VkDescriptorImageInfo.Buffer transparencyHintInfo = VkDescriptorImageInfo.calloc(1, stack)
                 .sampler(0L).imageView(transparencyHintOutput.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
             VkDescriptorImageInfo.Buffer currentColorInfo = VkDescriptorImageInfo.calloc(1, stack)
@@ -764,9 +739,8 @@ public final class MotionVectorGenerator implements AutoCloseable {
             descriptorWrite(writes.get(0), this.descriptorSets[slot], 0, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER).pImageInfo(currentInfo);
             descriptorWrite(writes.get(1), this.descriptorSets[slot], 2, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(motionInfo);
             descriptorWrite(writes.get(2), this.descriptorSets[slot], 3, VK12.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER).pBufferInfo(bufferInfo);
-            descriptorWrite(writes.get(3), this.descriptorSets[slot], 6, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(historyBiasInfo);
-            descriptorWrite(writes.get(4), this.descriptorSets[slot], 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(transparencyHintInfo);
-            descriptorWrite(writes.get(5), this.descriptorSets[slot], 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER).pImageInfo(currentColorInfo);
+            descriptorWrite(writes.get(3), this.descriptorSets[slot], 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(transparencyHintInfo);
+            descriptorWrite(writes.get(4), this.descriptorSets[slot], 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER).pImageInfo(currentColorInfo);
             VK12.vkUpdateDescriptorSets(this.backend.vkDevice(), writes, null);
         }
     }
@@ -779,7 +753,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
         VulkanGpuTextureView depthDebugOutput,
         VulkanGpuTextureView motionDebugOutput,
         VulkanGpuTextureView motionValidityOutput,
-        VulkanGpuTextureView historyBiasOutput,
         VulkanGpuTextureView transparencyHintOutput
     ) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -793,8 +766,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
                 .sampler(0L).imageView(motionDebugOutput.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
             VkDescriptorImageInfo.Buffer motionValidityInfo = VkDescriptorImageInfo.calloc(1, stack)
                 .sampler(0L).imageView(motionValidityOutput.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
-            VkDescriptorImageInfo.Buffer historyBiasInfo = VkDescriptorImageInfo.calloc(1, stack)
-                .sampler(0L).imageView(historyBiasOutput.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
             VkDescriptorImageInfo.Buffer transparencyHintInfo = VkDescriptorImageInfo.calloc(1, stack)
                 .sampler(0L).imageView(transparencyHintOutput.vkImageView()).imageLayout(VK12.VK_IMAGE_LAYOUT_GENERAL);
             VkDescriptorImageInfo.Buffer currentColorInfo = VkDescriptorImageInfo.calloc(1, stack)
@@ -807,10 +778,9 @@ public final class MotionVectorGenerator implements AutoCloseable {
             descriptorWrite(writes.get(2), this.descriptorSets[slot], 3, VK12.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER).pBufferInfo(bufferInfo);
             descriptorWrite(writes.get(3), this.descriptorSets[slot], 4, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(depthDebugInfo);
             descriptorWrite(writes.get(4), this.descriptorSets[slot], 5, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(motionDebugInfo);
-            descriptorWrite(writes.get(5), this.descriptorSets[slot], 6, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(historyBiasInfo);
-            descriptorWrite(writes.get(6), this.descriptorSets[slot], 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(transparencyHintInfo);
-            descriptorWrite(writes.get(7), this.descriptorSets[slot], 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER).pImageInfo(currentColorInfo);
-            descriptorWrite(writes.get(8), this.descriptorSets[slot], 9, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(motionValidityInfo);
+            descriptorWrite(writes.get(5), this.descriptorSets[slot], 7, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(transparencyHintInfo);
+            descriptorWrite(writes.get(6), this.descriptorSets[slot], 8, VK12.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER).pImageInfo(currentColorInfo);
+            descriptorWrite(writes.get(7), this.descriptorSets[slot], 9, VK12.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE).pImageInfo(motionValidityInfo);
             VK12.vkUpdateDescriptorSets(this.backend.vkDevice(), writes, null);
         }
     }
@@ -1430,10 +1400,8 @@ public final class MotionVectorGenerator implements AutoCloseable {
                     );
                     this.inventory.destroyed(
                         ResourceKind.DESCRIPTOR,
-                        descriptorSlotsForSets(
-                            descriptorSetCount,
-                            this.developerDiagnostics
-                        )
+                        descriptorSetCount
+                            * (DESCRIPTOR_COUNT / FRAME_RING_SIZE)
                     );
                 }
             } catch (Throwable error) {
@@ -1543,29 +1511,6 @@ public final class MotionVectorGenerator implements AutoCloseable {
             this.rawResourcesDestroyed = true;
         }
         return fullyDestroyed;
-    }
-
-    static int descriptorBindingCount(
-        boolean developerDiagnostics
-    ) {
-        return developerDiagnostics
-            ? DIAGNOSTIC_DESCRIPTOR_BINDING_COUNT
-            : RELEASE_DESCRIPTOR_BINDING_COUNT;
-    }
-
-    static int descriptorSlotsForSets(
-        int descriptorSetCount,
-        boolean developerDiagnostics
-    ) {
-        if (descriptorSetCount < 0) {
-            throw new IllegalArgumentException(
-                "descriptor set count must not be negative"
-            );
-        }
-        return Math.multiplyExact(
-            descriptorSetCount,
-            descriptorBindingCount(developerDiagnostics)
-        );
     }
 
     private static void logNativeDestroyFailure(

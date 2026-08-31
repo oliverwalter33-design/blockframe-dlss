@@ -5,8 +5,6 @@
   "compatibilityLevel": "JAVA_25",
   "plugin": "de.morau.nvidiadlss.mixin.DlssMixinPlugin",
   "client": [
-    "BricksCompositeBlockEntityDistanceMixin",
-    "BricksFarLodLevelRendererMixin",
     "ClientPacketListenerMixin",
     "CommandEncoderAccessor",
     "FastStartLevelLoadingScreenMixin",

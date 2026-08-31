@@ -14,22 +14,19 @@ import de.morau.blockframe.core.state.FeatureId;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.OptionalDouble;
-import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK12;
-import org.lwjgl.vulkan.VkSamplerCreateInfo;
 
 /**
- * Material-aware Vulkan sampler policy. The dimensions-derived upscaling bias
- * is applied to exact solid and alpha-tested cutout terrain scopes while every
- * BlockFrame-owned sampler remains device-scoped and bounded.
+ * Material-aware Vulkan sampler policy. Upscaling bias is never applied to
+ * cutout terrain, and every BlockFrame-owned sampler remains device-scoped
+ * and bounded.
  */
 public final class DlssSamplerPolicy {
     static final int MAX_MATERIAL_SAMPLERS = 64;
-    static final long CACHE_METADATA_REQUESTED_BYTES = 8_704L;
-    static final long CACHE_METADATA_COMMITTED_BYTES = 12_288L;
+    static final long CACHE_METADATA_REQUESTED_BYTES = 7_680L;
+    static final long CACHE_METADATA_COMMITTED_BYTES = 8_192L;
 
-    private static final ThreadLocal<ConstructionState>
-        CONSTRUCTION_STATE =
+    private static final ThreadLocal<BiasState> CONSTRUCTION_BIAS =
         new ThreadLocal<>();
     private static final FixedMaterialSamplerCache.SamplerFactory
         PRODUCTION_FACTORY =
@@ -45,156 +42,39 @@ public final class DlssSamplerPolicy {
             new RuntimeBudgetLeaseController();
 
     private static VulkanDevice lifecycleDevice;
-    private static FixedMaterialSamplerCacheLifecycle cacheLifecycle;
-    private static long deviceGenerationSequence;
+    private static FixedMaterialSamplerCache activeCache;
+    private static FixedMaterialSamplerCache retiringCache;
     private static FixedMaterialSamplerCache.LeaseController
         pendingCreationLeases;
     private static long pendingCreationLease;
+    private static boolean cacheCreationAttempted;
     private static boolean closePrepareConfirmed;
     private static String status = "not connected";
 
     private DlssSamplerPolicy() {
     }
 
-    /**
-     * Captures the descriptor actually submitted to Vulkan. During a private
-     * BlockFrame clone construction it first replays the immutable original
-     * descriptor and substitutes only the already validated absolute bias.
-     */
-    public static VulkanSamplerDescriptor prepareSamplerCreateInfo(
-        VkSamplerCreateInfo createInfo
-    ) {
-        Objects.requireNonNull(createInfo, "createInfo");
-        ConstructionState state = CONSTRUCTION_STATE.get();
-        if (state != null && state.active) {
-            state.originalDescriptor.replayInto(
-                createInfo,
-                state.finalBias,
-                MemoryStack.stackGet()
-            );
-        }
-        return VulkanSamplerDescriptor.capture(createInfo);
+    public static float constructionBias(float original) {
+        BiasState state = CONSTRUCTION_BIAS.get();
+        return state != null && state.active
+            ? state.value
+            : original;
     }
 
     public static synchronized float biasFor(GpuSampler sampler) {
         if (sampler == null) {
             return 0.0F;
         }
-        FixedMaterialSamplerCache cache = cacheLifecycle == null
-            ? null
-            : cacheLifecycle.activeCache();
-        float activeBias = cache == null
+        float activeBias = activeCache == null
             ? Float.NaN
-            : cache.biasFor(sampler);
+            : activeCache.biasFor(sampler);
         if (!Float.isNaN(activeBias)) {
             return activeBias;
         }
-        if (
-            sampler instanceof VulkanGpuSamplerDescriptorAccess access
-                && access.blockframe$samplerDescriptor() != null
-        ) {
-            return access.blockframe$samplerDescriptor().mipLodBias();
-        }
-        return 0.0F;
-    }
-
-    /**
-     * Atomically selects the exact sampler-cache generation committed by the
-     * DLSS resource owner. Repeated calls with the same key reuse the existing
-     * cache; a resize, mode/preset change, or reload epoch queues the previous
-     * private samplers through Mojang before publishing a replacement.
-     */
-    public static synchronized boolean activateGeneration(
-        VulkanDevice device,
-        int renderWidth,
-        int renderHeight,
-        int outputWidth,
-        int outputHeight,
-        int modeId,
-        int presetId,
-        float lodBiasDelta,
-        long reloadEpoch
-    ) {
-        if (
-            device == null
-                || device != lifecycleDevice
-                || cacheLifecycle == null
-                || closePrepareConfirmed
-        ) {
-            status =
-                "original fallback: sampler lifecycle is not active";
-            return false;
-        }
-        try {
-            if (
-                !BlockframeRuntime.featureEnabled(
-                    FeatureId.MATERIAL_SAMPLER_CACHE
-                )
-            ) {
-                cacheLifecycle.deactivate(PRODUCTION_CLOSER);
-                status =
-                    "original fallback: disabled by process feature policy";
-                return false;
-            }
-            FixedMaterialSamplerCacheLifecycle.GenerationKey key =
-                new FixedMaterialSamplerCacheLifecycle.GenerationKey(
-                    device,
-                    deviceGenerationSequence,
-                    renderWidth,
-                    renderHeight,
-                    outputWidth,
-                    outputHeight,
-                    modeId,
-                    presetId,
-                    lodBiasDelta,
-                    reloadEpoch
-                );
-            FixedMaterialSamplerCache cache = cacheLifecycle.switchTo(
-                key,
-                () -> createCache(device),
-                PRODUCTION_CLOSER
-            );
-            if (cache == null) {
-                status = cacheLifecycle.status();
-                return false;
-            }
-            status = cache.status();
-            return true;
-        } catch (
-            RuntimeException
-                | LinkageError
-                | OutOfMemoryError error
-        ) {
-            status =
-                "original fallback: sampler generation activation failed";
-            BlockframeRuntime.featureUsedFallback(
-                FeatureId.MATERIAL_SAMPLER_CACHE,
-                true,
-                true,
-                "generation-activation-fallback"
-            );
-            return false;
-        }
-    }
-
-    /** OFF, minimize, and non-world states must not retain a stale clone. */
-    public static synchronized boolean deactivateGeneration(
-        VulkanDevice device
-    ) {
-        if (
-            device == null
-                || device != lifecycleDevice
-                || cacheLifecycle == null
-        ) {
-            return true;
-        }
-        if (closePrepareConfirmed) {
-            return true;
-        }
-        boolean deactivated =
-            cacheLifecycle.deactivate(PRODUCTION_CLOSER);
-        status = cacheLifecycle.status();
-        return deactivated;
+        float retiringBias = retiringCache == null
+            ? Float.NaN
+            : retiringCache.biasFor(sampler);
+        return Float.isNaN(retiringBias) ? 0.0F : retiringBias;
     }
 
     public static synchronized GpuSampler materialSampler(
@@ -206,6 +86,7 @@ public final class DlssSamplerPolicy {
             device == null
                 || original == null
                 || !DlssRenderer.isWorldPass()
+                || cutoutTerrain
         ) {
             return original;
         }
@@ -219,8 +100,8 @@ public final class DlssSamplerPolicy {
                     "original fallback: disabled by process feature policy";
                 return original;
             }
-            float biasDelta = DlssRenderer.currentLodBias();
-            if (biasDelta >= -0.001F) {
+            float bias = DlssRenderer.currentLodBias();
+            if (bias >= -0.001F) {
                 return original;
             }
             if (device != lifecycleDevice) {
@@ -229,79 +110,22 @@ public final class DlssSamplerPolicy {
                 return original;
             }
 
-            if (
-                !(original
-                    instanceof VulkanGpuSamplerDescriptorAccess access)
-            ) {
-                status =
-                    "original fallback: Vulkan sampler descriptor unavailable";
-                return original;
-            }
-            VulkanSamplerDescriptor originalDescriptor =
-                access.blockframe$samplerDescriptor();
-            if (
-                originalDescriptor == null
-                    || !originalDescriptor.canReplay()
-            ) {
-                status =
-                    "original fallback: sampler pNext/state is not replayable";
-                return original;
-            }
-            if (!(device instanceof VulkanSamplerDeviceLimits limits)) {
-                status =
-                    "original fallback: sampler LOD-bias limit unavailable";
-                return original;
-            }
-            float maximumBias = limits.blockframe$maxSamplerLodBias();
-            float requestedBias =
-                originalDescriptor.mipLodBias() + biasDelta;
-            float finalBias = finalSamplerBias(
-                originalDescriptor.mipLodBias(),
-                biasDelta,
-                maximumBias
-            );
-            if (!Float.isFinite(finalBias)) {
-                status =
-                    "original fallback: invalid sampler LOD-bias inputs";
-                return original;
-            }
-            if (
-                Float.floatToRawIntBits(requestedBias)
-                    != Float.floatToRawIntBits(finalBias)
-            ) {
-                NvidiaDlssMod.LOGGER.warn(
-                    "DLSS sampler LOD bias clamped from {} to {} by Vulkan maxSamplerLodBias {}",
-                    requestedBias,
-                    finalBias,
-                    maximumBias
-                );
-            }
-            if (
-                Float.floatToRawIntBits(finalBias)
-                    == originalDescriptor.mipLodBiasBits()
-            ) {
-                return original;
-            }
-
-            FixedMaterialSamplerCache cache = cacheLifecycle == null
-                ? null
-                : cacheLifecycle.activeCache();
+            FixedMaterialSamplerCache cache = activeCache;
             if (cache == null) {
-                status =
-                    "original fallback: no committed sampler generation";
-                return original;
+                cache = createCache(device);
+                if (cache == null) {
+                    return original;
+                }
             }
-            int anisotropy = original.getMaxAnisotropy();
             GpuSampler selected = (GpuSampler)cache.select(
                 original,
-                originalDescriptor,
                 original.getAddressModeU(),
                 original.getAddressModeV(),
                 original.getMinFilter(),
                 original.getMagFilter(),
-                anisotropy,
+                original.getMaxAnisotropy(),
                 original.getMaxLod(),
-                finalBias,
+                bias,
                 PRODUCTION_FACTORY,
                 PRODUCTION_OBSERVER
             );
@@ -350,27 +174,16 @@ public final class DlssSamplerPolicy {
             return;
         }
         if (
-            cacheLifecycle != null
+            activeCache != null
+                || retiringCache != null
                 || pendingCreationLease != 0L
         ) {
             status =
                 "original fallback: prior device ownership remains unconfirmed";
             return;
         }
-        if (deviceGenerationSequence == Long.MAX_VALUE) {
-            status =
-                "original fallback: Vulkan device generation exhausted";
-            return;
-        }
-        long nextGeneration = deviceGenerationSequence + 1L;
-        FixedMaterialSamplerCacheLifecycle nextLifecycle =
-            new FixedMaterialSamplerCacheLifecycle(
-                device,
-                nextGeneration
-            );
-        deviceGenerationSequence = nextGeneration;
         lifecycleDevice = device;
-        cacheLifecycle = nextLifecycle;
+        cacheCreationAttempted = false;
         closePrepareConfirmed = false;
         status = "connected; cache not requested";
     }
@@ -392,24 +205,32 @@ public final class DlssSamplerPolicy {
             return true;
         }
         if (device == null || device != lifecycleDevice) {
-            return cacheLifecycle == null
+            return activeCache == null
+                && retiringCache == null
                 && pendingCreationLease == 0L;
         }
         if (!retryPendingCreationCleanup()) {
             return false;
         }
-        FixedMaterialSamplerCacheLifecycle lifecycle = cacheLifecycle;
-        if (
-            lifecycle != null
-                && !lifecycle.prepareDeviceClose(PRODUCTION_CLOSER)
-        ) {
-            status = lifecycle.status();
+        FixedMaterialSamplerCache cache = activeCache;
+        if (cache == null) {
+            status = "closed: no material sampler cache";
+            closePrepareConfirmed = true;
+            return true;
+        }
+        if (!cache.prepareDeviceClose(PRODUCTION_CLOSER)) {
+            status = cache.status();
             return false;
         }
+        activeCache = null;
+        if (cache.requiresEncoderDrain()) {
+            retiringCache = cache;
+            status = cache.status();
+        } else {
+            cache.finishDeviceCloseAfterEncoderDrain();
+            status = "closed: empty material sampler cache";
+        }
         closePrepareConfirmed = true;
-        status = lifecycle == null
-            ? "closed: no material sampler lifecycle"
-            : lifecycle.status();
         return true;
     }
 
@@ -418,7 +239,8 @@ public final class DlssSamplerPolicy {
     ) {
         if (device == null || device != lifecycleDevice) {
             return closePrepareConfirmed
-                && cacheLifecycle == null
+                && activeCache == null
+                && retiringCache == null
                 && pendingCreationLease == 0L;
         }
         if (!closePrepareConfirmed) {
@@ -427,17 +249,21 @@ public final class DlssSamplerPolicy {
         if (!retryPendingCreationCleanup()) {
             return false;
         }
-        FixedMaterialSamplerCacheLifecycle lifecycle = cacheLifecycle;
-        if (
-            lifecycle != null
-                && !lifecycle.finishDeviceCloseAfterEncoderDrain()
-        ) {
-            status = lifecycle.status();
+        if (activeCache != null) {
             return false;
         }
-        cacheLifecycle = null;
+        FixedMaterialSamplerCache cache = retiringCache;
+        if (
+            cache != null
+                && !cache.finishDeviceCloseAfterEncoderDrain()
+        ) {
+            status = cache.status();
+            return false;
+        }
+        retiringCache = null;
         lifecycleDevice = null;
-        CONSTRUCTION_STATE.remove();
+        cacheCreationAttempted = false;
+        CONSTRUCTION_BIAS.remove();
         status = "closed after encoder drain";
         return true;
     }
@@ -478,55 +304,25 @@ public final class DlssSamplerPolicy {
     }
 
     public static synchronized String debugStatus() {
-        FixedMaterialSamplerCacheLifecycle lifecycle = cacheLifecycle;
-        if (lifecycle == null) {
-            return status;
-        }
-        FixedMaterialSamplerCache cache = lifecycle.activeCache();
-        return cache == null ? lifecycle.status() : cache.status();
+        FixedMaterialSamplerCache cache = activeCache != null
+            ? activeCache
+            : retiringCache;
+        return cache == null
+            ? status
+            : cache.status();
     }
 
     static void clearClientThreadState() {
-        CONSTRUCTION_STATE.remove();
-    }
-
-    static int materialAnisotropy(
-        int original,
-        int deviceMaximum
-    ) {
-        int supported = Math.max(1, deviceMaximum);
-        return Math.clamp(original, 1, supported);
-    }
-
-    static float finalSamplerBias(
-        float nativeBias,
-        float delta,
-        float maximumAbsoluteBias
-    ) {
-        if (
-            !Float.isFinite(nativeBias)
-                || !Float.isFinite(delta)
-                || !Float.isFinite(maximumAbsoluteBias)
-                || maximumAbsoluteBias < 0.0F
-        ) {
-            return Float.NaN;
-        }
-        float requested = nativeBias + delta;
-        if (!Float.isFinite(requested)) {
-            return Float.NaN;
-        }
-        return Math.max(
-            -maximumAbsoluteBias,
-            Math.min(maximumAbsoluteBias, requested)
-        );
+        CONSTRUCTION_BIAS.remove();
     }
 
     private static FixedMaterialSamplerCache createCache(
         VulkanDevice device
     ) {
-        if (pendingCreationLease != 0L) {
+        if (cacheCreationAttempted || pendingCreationLease != 0L) {
             return null;
         }
+        cacheCreationAttempted = true;
         ShaderResourceInventory inventory;
         try {
             inventory = BlockframeRuntime.shaderResources();
@@ -588,6 +384,7 @@ public final class DlssSamplerPolicy {
                 inventory,
                 MAX_MATERIAL_SAMPLERS
             );
+            activeCache = cache;
             pendingCreationLease = 0L;
             pendingCreationLeases = null;
             status =
@@ -618,7 +415,6 @@ public final class DlssSamplerPolicy {
 
     private static GpuSampler createBiasedSampler(
         Object device,
-        Object samplerDescriptor,
         Object addressModeU,
         Object addressModeV,
         Object minFilter,
@@ -628,30 +424,18 @@ public final class DlssSamplerPolicy {
         float bias
     ) {
         VulkanDevice backend = (VulkanDevice)device;
-        if (
-            !(samplerDescriptor
-                instanceof VulkanSamplerDescriptor originalDescriptor)
-                || !originalDescriptor.canReplay()
-        ) {
-            throw new IllegalArgumentException(
-                "sampler descriptor is not safely replayable"
-            );
-        }
-        ConstructionState state = CONSTRUCTION_STATE.get();
+        BiasState state = CONSTRUCTION_BIAS.get();
         boolean localState = state == null;
         if (localState) {
-            state = new ConstructionState();
-            CONSTRUCTION_STATE.set(state);
+            state = new BiasState();
+            CONSTRUCTION_BIAS.set(state);
         }
         boolean previousActive = state.active;
-        VulkanSamplerDescriptor previousDescriptor =
-            state.originalDescriptor;
-        float previousBias = state.finalBias;
+        float previousValue = state.value;
         state.active = true;
-        state.originalDescriptor = originalDescriptor;
-        state.finalBias = bias;
+        state.value = bias;
         try {
-            GpuSampler created = backend.createSampler(
+            return backend.createSampler(
                 (AddressMode)addressModeU,
                 (AddressMode)addressModeV,
                 (FilterMode)minFilter,
@@ -659,38 +443,12 @@ public final class DlssSamplerPolicy {
                 maxAnisotropy,
                 maxLod
             );
-            VulkanSamplerDescriptor actualDescriptor =
-                created
-                        instanceof VulkanGpuSamplerDescriptorAccess access
-                    ? access.blockframe$samplerDescriptor()
-                    : null;
-            if (
-                actualDescriptor == null
-                    || !actualDescriptor.canReplay()
-                    || !actualDescriptor.matchesReplayOf(
-                        originalDescriptor,
-                        bias
-                    )
-            ) {
-                IllegalStateException rejection =
-                    new IllegalStateException(
-                        "created Vulkan sampler descriptor failed replay verification"
-                    );
-                try {
-                    created.close();
-                } catch (Throwable closeError) {
-                    rejection.addSuppressed(closeError);
-                }
-                throw rejection;
-            }
-            return created;
         } finally {
             if (localState) {
-                CONSTRUCTION_STATE.remove();
+                CONSTRUCTION_BIAS.remove();
             } else {
                 state.active = previousActive;
-                state.originalDescriptor = previousDescriptor;
-                state.finalBias = previousBias;
+                state.value = previousValue;
             }
         }
     }
@@ -716,7 +474,7 @@ public final class DlssSamplerPolicy {
             );
         }
         NvidiaDlssMod.LOGGER.info(
-            "DLSS-Materialsampler {}/{}: Solid-/Cutout-Terrain LOD-Bias {} / anisotropisch {}x",
+            "DLSS-Materialsampler {}/{}: Solid-Terrain LOD-Bias {} / Cutout-Terrain 0 / anisotropisch {}x",
             slot + 1,
             MAX_MATERIAL_SAMPLERS,
             String.format(Locale.ROOT, "%.3f", bias),
@@ -750,9 +508,8 @@ public final class DlssSamplerPolicy {
         }
     }
 
-    private static final class ConstructionState {
+    private static final class BiasState {
         private boolean active;
-        private VulkanSamplerDescriptor originalDescriptor;
-        private float finalBias = Float.NaN;
+        private float value = Float.NaN;
     }
 }

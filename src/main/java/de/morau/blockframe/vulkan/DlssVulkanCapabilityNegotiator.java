@@ -51,9 +51,6 @@ public final class DlssVulkanCapabilityNegotiator {
     public static final String BUFFER_DEVICE_ADDRESS_FEATURE =
         "bufferDeviceAddress";
     public static final String SHADER_FLOAT16_FEATURE = "shaderFloat16";
-    public static final String
-        SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE =
-            "shaderStorageImageWriteWithoutFormat";
 
     public static final Set<String> DEVICE_EXTENSION_CANDIDATES = orderedSet(
         PUSH_DESCRIPTOR,
@@ -75,15 +72,8 @@ public final class DlssVulkanCapabilityNegotiator {
             EXTERNAL_MEMORY_CAPABILITIES,
             VULKAN_API_1_1
         );
-    // VK_EXT_buffer_device_address was deprecated by the KHR replacement,
-    // which was promoted to Vulkan 1.2.  When the Vulkan 1.2 core feature is
-    // used, neither extension name is requested; in particular, enabling the
-    // EXT name beside VkPhysicalDeviceVulkan12Features::bufferDeviceAddress is
-    // forbidden by VUID-VkDeviceCreateInfo-pNext-04748.
     private static final Map<String, Integer> DEVICE_CORE_PROMOTIONS =
         promotionMap(
-            EXT_BUFFER_DEVICE_ADDRESS,
-            VULKAN_API_1_2,
             KHR_BUFFER_DEVICE_ADDRESS,
             VULKAN_API_1_2,
             EXT_DESCRIPTOR_INDEXING,
@@ -145,33 +135,10 @@ public final class DlssVulkanCapabilityNegotiator {
             };
             if (supported == null) {
                 unsupportedFeatures.add(feature);
-                continue;
+            } else {
+                (supported ? enabledFeatures : missingFeatures).add(feature);
             }
-            if (
-                Integer.compareUnsigned(apiVersion, VULKAN_API_1_2) < 0
-            ) {
-                // The Mojang integration enables these through
-                // VkPhysicalDeviceVulkan12Features.  Do not put that core
-                // structure on a Vulkan 1.0/1.1 device-creation chain; an
-                // extension-specific feature path would have to be negotiated
-                // and represented separately.
-                missingFeatures.add(feature);
-                continue;
-            }
-            (supported ? enabledFeatures : missingFeatures).add(feature);
         }
-        // Manual Streamline Vulkan integration leaves device creation to the
-        // host. Streamline's setVulkanInfo path creates an internal shader
-        // declaring StorageImageWriteWithoutFormat. The application targets
-        // Vulkan 1.2, so publish the Vulkan 1.0 feature explicitly instead of
-        // relying on the separate Vulkan 1.3 / format-feature-flags2 paths.
-        // Requiring probed support here also makes an unsupported device fail
-        // closed before Streamline can create that shader.
-        (
-            availableFeatures.shaderStorageImageWriteWithoutFormat()
-                ? enabledFeatures
-                : missingFeatures
-        ).add(SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE);
         unsupportedFeatures.addAll(requirements.vulkanFeatures13());
 
         return new DeviceSelection(
@@ -212,8 +179,7 @@ public final class DlssVulkanCapabilityNegotiator {
         boolean timelineSemaphore,
         boolean descriptorIndexing,
         boolean bufferDeviceAddress,
-        boolean shaderFloat16,
-        boolean shaderStorageImageWriteWithoutFormat
+        boolean shaderFloat16
     ) {
     }
 
@@ -318,8 +284,7 @@ public final class DlssVulkanCapabilityNegotiator {
         DeviceSelection device
     ) {
         if (ready) {
-            return "Authoritative Streamline 2.12 DLSS+NIS Vulkan "
-                + "requirements and manual-host shader capability met"
+            return "Authoritative Streamline 2.12 DLSS+NIS Vulkan requirements met"
                 + promotedReason(instance, device)
                 + ".";
         }
@@ -339,7 +304,7 @@ public final class DlssVulkanCapabilityNegotiator {
         }
         if (!device.missingFeatures().isEmpty()) {
             reasons.add(
-                "missing required Vulkan device features "
+                "missing Vulkan 1.2 features "
                     + sorted(device.missingFeatures())
             );
         }

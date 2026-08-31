@@ -1,12 +1,12 @@
 # BlockFrame DLSS
 
-[![Source provenance](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/source-provenance.yml/badge.svg)](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/source-provenance.yml)
+<p align="center">
+  <img src="docs/assets/blockframe-dlss-icon.png" alt="BlockFrame DLSS logo" width="220">
+</p>
 
 BlockFrame DLSS is an experimental client-side NeoForge mod that integrates NVIDIA DLSS Super Resolution and DLAA into Minecraft 26.2's native Vulkan renderer.
 
 > **Experimental:** image quality, compatibility and performance can vary by GPU, driver, resolution, resource pack, shader pack and other rendering mods.
-
-> **Official source:** Modrinth ownership and artifact correspondence are documented in [MODRINTH-OWNERSHIP.md](MODRINTH-OWNERSHIP.md). The exact 0.3.16 source tree is preserved on [`release/0.3.16-neoforge-26.2`](https://github.com/oliverwalter33-design/blockframe-dlss/tree/release/0.3.16-neoforge-26.2). Every native DLL and SPIR-V file in both Modrinth versions is mapped to its checked-in source or exact official NVIDIA release in [MODRINTH-BINARY-PROVENANCE.md](MODRINTH-BINARY-PROVENANCE.md).
 
 ## Download
 
@@ -41,16 +41,11 @@ The controls are available under **Options -> Video Settings -> DLSS**. The comp
 
 ## Building the source
 
-Run source checks with Java 25 and Gradle 9.2.1:
+Run source checks with Java 25:
 
 ```powershell
-gradle clean test
+.\gradlew.bat clean test
 ```
-
-This source-only publication intentionally omits the binary
-`gradle-wrapper.jar`. The required Gradle version remains pinned in
-`gradle/wrapper/gradle-wrapper.properties`; use an installed Gradle 9.2.1 or
-regenerate the standard wrapper locally with that version.
 
 The build has no Sodium compile dependency and does not bundle Sodium source.
 When Sodium 0.9.1 is present, an optional `@Pseudo` compatibility mixin marks
@@ -70,16 +65,10 @@ Native SDK binaries are deliberately not tracked in Git. To create a working rel
 ```powershell
 .\scripts\stage-nvidia-runtime.ps1 -StreamlineBin 'C:\path\to\streamline\bin\x64'
 .\native\build-native.ps1
-gradle clean test build
-.\scripts\verify-native-provenance.ps1 -JarPath '.\build\libs\blockframe-dlss-0.3.18-neoforge-26.2.jar'
+.\gradlew.bat clean test build
 ```
 
 `build` intentionally fails when a required native runtime file is absent. The finished JAR is written to `build\libs`.
-The final verification command recognizes either published Modrinth JAR by
-SHA-256 and checks every native binary entry against its version-specific
-review manifest. For a new release, add its JAR and native-entry hashes to the
-verification script; `-ExpectedJarSha256` can additionally pin an invocation
-to one expected artifact.
 
 The native build script also accepts explicit `-StreamlineInclude`, `-VulkanInclude`, `-JniInclude`, `-ZigExecutable` and `-GlslcExecutable` parameters.
 
@@ -107,7 +96,7 @@ registry, loot, block-entity, model, shader or pipeline state. See
 The native-only five-cold-entry/five-warm-entry microbenchmark is:
 
 ```powershell
-gradle benchmarkNativeCache --no-daemon --rerun-tasks
+.\gradlew.bat benchmarkNativeCache --no-daemon --rerun-tasks
 ```
 
 ## Optional feature switches and Safe Start

@@ -127,7 +127,7 @@ class Phase1a7ShaderResourceSourceContractTest {
 
         assertTrue(
             mixin.contains(
-                "activePipeline.info().getLocation()"
+                "activePipeline.info().getLocation().getPath()"
             )
         );
         assertTrue(
@@ -166,21 +166,9 @@ class Phase1a7ShaderResourceSourceContractTest {
         );
         assertTrue(
             mixin.contains(
-                "DlssTerrainSamplerScope.isBlockAtlas(textureLabel)"
+                "nvidiaDlss$containsIgnoreCase("
             )
         );
-        assertTrue(
-            mixin.contains(
-                "DlssTerrainSamplerScope.eligible(\n"
-                    + "                    pipelineId,"
-            )
-        );
-        assertTrue(
-            mixin.contains(
-                "DlssTerrainSamplerScope.isCutout(pipelineId)"
-            )
-        );
-        assertFalse(mixin.contains("getLocation().getPath()"));
         assertFalse(mixin.contains(".toLowerCase("));
         assertFalse(policy.contains("new SamplerKey"));
         assertFalse(cache.contains("new SamplerKey"));

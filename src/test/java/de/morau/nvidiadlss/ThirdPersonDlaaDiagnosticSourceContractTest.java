@@ -18,15 +18,8 @@ class ThirdPersonDlaaDiagnosticSourceContractTest {
         assertTrue(capture.contains("_C_pre_sl_motion_rg16f.bin"));
         assertTrue(capture.contains("_C_pre_sl_motion_validity_r8ui.png"));
         assertTrue(capture.contains("_C_pre_sl_motion_validity_r8ui.bin"));
-        assertTrue(capture.contains("_D0_player_history_bias.png"));
-        assertTrue(capture.contains("_D0_player_history_bias_rgba8.bin"));
-        assertTrue(capture.contains("pixelSize != 4"));
-        assertTrue(capture.contains("erwartet RGBA8"));
-        assertTrue(capture.contains(
-            "read.data().get((x + y * region.width) * pixelSize)"
-        ));
         assertTrue(capture.contains("_D_transparency_hint.png"));
-        assertTrue(capture.contains("_E_post_sl_output.png"));
+        assertTrue(capture.contains("_E_post_sl_dlaa.png"));
         assertTrue(capture.contains("_F0_post_renderlevel_before_entity_outline.png"));
         assertTrue(capture.contains("_F_backbuffer_source_after_all_passes.png"));
     }
@@ -42,13 +35,12 @@ class ThirdPersonDlaaDiagnosticSourceContractTest {
         assertTrue(!audit.contains("devInvalidDepthMotionHint"));
         assertTrue(renderer.contains("TemporalHintAudit.secondaryHintMode"));
         assertTrue(!shader.contains("auditHintPolicy"));
-        assertTrue(shader.contains("HistoryBiasOutput"));
-        assertTrue(shader.contains("articulatedDisocclusionBias"));
+        assertTrue(!shader.contains("HistoryBiasOutput"));
         assertTrue(!shader.contains("PreviousDepth"));
-        assertTrue(bridge.contains("sl::kBufferTypeBiasCurrentColorHint"));
+        assertTrue(!bridge.contains("sl::kBufferTypeBiasCurrentColorHint"));
         assertTrue(!bridge.contains("sl::kBufferTypeInvalidDepthMotionHint"));
         assertTrue(bridge.contains("sl::kBufferTypeTransparencyHint"));
-        assertTrue(bridge.contains("sl::ResourceLifecycle::eValidUntilEvaluate"));
+        assertTrue(bridge.contains("sl::ResourceLifecycle::eOnlyValidNow"));
     }
 
     @Test

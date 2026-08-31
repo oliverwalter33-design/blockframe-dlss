@@ -78,10 +78,6 @@ tasks.named('runVulkanClient').configure {
 
 dependencies {
     compileOnly "net.caffeinemc:sodium-neoforge-api:${sodium_version}"
-    // Exact, compile-time-only API evidence for the fail-closed Bricks 1.0.1
-    // compatibility path. The artifact boundary test forbids packaging it.
-    compileOnly files(project.bricks_compat_evidence_jar)
-    testImplementation files(project.bricks_compat_evidence_jar)
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.joml:joml:1.10.8'
@@ -231,14 +227,6 @@ configurations {
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     systemProperty 'blockframe.projectDir', project.projectDir.absolutePath
-    systemProperty(
-        'blockframe.bricksCompatEvidenceJar',
-        project.bricks_compat_evidence_jar
-    )
-    systemProperty(
-        'blockframe.minecraft26057PatchedEvidenceJar',
-        project.minecraft_26_2_0_57_patched_evidence_jar
-    )
     def junitTempRoot = layout.buildDirectory.dir(
         "tmp/junit/${name}"
     )
@@ -283,38 +271,11 @@ tasks.withType(Test).configureEach {
     }
 }
 
-tasks.named('test', Test) {
-    dependsOn tasks.named('jar')
-    inputs.file(tasks.named('jar', Jar).flatMap { it.archiveFile })
-        .withPropertyName('blockframeDistributableJar')
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    doFirst {
-        systemProperty(
-            'blockframe.distributableJar',
-            tasks.named('jar', Jar).get().archiveFile.get().asFile.absolutePath
-        )
-    }
-}
-
-def phase2a0bFixtureInputs = [
-    'benchmarks/fixtures/blockframe-benchmark-config-v1.json',
-    'benchmarks/fixtures/blockframe-2a0b-captured-runtime-v2.json',
-    'benchmarks/fixtures/blockframe-dtc-scenes-v1.json',
-    'benchmarks/fixtures/blockframe-dtc-scenes-v2.json'
-].collect { layout.projectDirectory.file(it) }
-
 tasks.register('phase2a0bTest', Test) {
     group = 'verification'
     description = 'Runs the isolated Phase 2A.0B fixture, replay, measurement and CPU snapshot contract tests.'
-    dependsOn tasks.named('jar')
     testClassesDirs = sourceSets.phase2a0bTest.output.classesDirs
     classpath = sourceSets.phase2a0bTest.runtimeClasspath
-    inputs.files(phase2a0bFixtureInputs)
-        .withPropertyName('phase2a0bFixtureInputs')
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.file(tasks.named('jar', Jar).flatMap { it.archiveFile })
-        .withPropertyName('phase2a0bProductionJar')
-        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.register('phase2a0bHarnessJar', Jar) {
@@ -953,7 +914,6 @@ tasks.register('sourceZip', Zip) {
     reproducibleFileOrder = true
 
     from(layout.projectDirectory) {
-        include '.gitattributes'
         include 'build.gradle'
         include 'CHANGELOG.md'
         include 'CHANGELOG-DE.md'
@@ -967,17 +927,8 @@ tasks.register('sourceZip', Zip) {
         include 'native/**'
         include 'README.md'
         include 'RELEASE-VERIFICATION-DE.md'
-        include 'MODRINTH-OWNERSHIP.md'
-        include 'MODRINTH-BINARY-PROVENANCE.md'
-        include '.github/**'
-        include 'scripts/**'
-        include 'provenance/**'
         include 'settings.gradle'
         include 'src/**'
-        include 'benchmarks/fixtures/blockframe-benchmark-config-v1.json'
-        include 'benchmarks/fixtures/blockframe-2a0b-captured-runtime-v2.json'
-        include 'benchmarks/fixtures/blockframe-dtc-scenes-v1.json'
-        include 'benchmarks/fixtures/blockframe-dtc-scenes-v2.json'
 
         // Keep the source bundle source-only and preserve the previous archive scope.
         exclude '**/*.dll'

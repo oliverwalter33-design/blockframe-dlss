@@ -25,7 +25,7 @@ class NativeRuntimeArtifactsTest {
         CacheKey key = NativeRuntimeArtifacts.loadKey();
 
         NativeRuntimeArtifacts.validateGeneratedResources(key, manifest);
-        assertEquals(62_697_358L, manifest.totalBytes());
+        assertEquals(62_721_934L, manifest.totalBytes());
         assertEquals(
             List.of(
                 "NvLowLatencyVk.dll",
@@ -83,7 +83,7 @@ class NativeRuntimeArtifactsTest {
             dimensions.get("neoforge-api-target")
         );
         assertEquals(
-            "0.3.18-neoforge-26.2",
+            "0.3.16-neoforge-26.2",
             dimensions.get("blockframe-version")
         );
         assertEquals("vulkan", dimensions.get("backend"));

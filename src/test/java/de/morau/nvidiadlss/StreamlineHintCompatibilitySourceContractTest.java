@@ -23,10 +23,8 @@ class StreamlineHintCompatibilitySourceContractTest {
     void nativeBridgeNeverTagsMaskTypesIgnoredByPinnedDlss() throws Exception {
         String source = source("native/nvidia_dlss_bridge.cpp");
         assertTrue(source.contains("auditHintMode == 1"));
-        assertTrue(source.contains("inputsWithTransparency"));
-        assertTrue(source.contains("inputsWithoutTransparency"));
-        assertTrue(source.contains("includeTransparencyHint ? 7u : 6u"));
-        assertTrue(source.contains("sl::kBufferTypeBiasCurrentColorHint"));
+        assertTrue(source.contains("tagsWithTransparency, 5"));
+        assertTrue(source.contains("tagsWithoutTransparency, 4"));
         assertFalse(source.contains("sl::kBufferTypeReactiveMaskHint"));
         assertFalse(source.contains("sl::kBufferTypeTransparencyAndCompositionMaskHint"));
     }

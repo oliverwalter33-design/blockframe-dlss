@@ -18,8 +18,6 @@ import de.morau.blockframe.core.budget.MemoryKind;
 final class DlssAuxiliaryResources {
     final GpuTexture motionTexture;
     final GpuTextureView motionView;
-    final GpuTexture historyBiasTexture;
-    final GpuTextureView historyBiasView;
     final GpuTexture depthDebugTexture;
     final GpuTextureView depthDebugView;
     final GpuTexture motionDebugTexture;
@@ -43,8 +41,6 @@ final class DlssAuxiliaryResources {
     private DlssAuxiliaryResources(
         GpuTexture motionTexture,
         GpuTextureView motionView,
-        GpuTexture historyBiasTexture,
-        GpuTextureView historyBiasView,
         GpuTexture depthDebugTexture,
         GpuTextureView depthDebugView,
         GpuTexture motionDebugTexture,
@@ -63,8 +59,6 @@ final class DlssAuxiliaryResources {
     ) {
         this.motionTexture = motionTexture;
         this.motionView = motionView;
-        this.historyBiasTexture = historyBiasTexture;
-        this.historyBiasView = historyBiasView;
         this.depthDebugTexture = depthDebugTexture;
         this.depthDebugView = depthDebugView;
         this.motionDebugTexture = motionDebugTexture;
@@ -117,7 +111,7 @@ final class DlssAuxiliaryResources {
         ResourceTransaction transaction;
         try {
             transaction = new ResourceTransaction(
-                developerDiagnostics ? 16 : 10
+                developerDiagnostics ? 14 : 8
             );
         } catch (Throwable error) {
             if (!budgets.release(lease)) {
@@ -142,20 +136,6 @@ final class DlssAuxiliaryResources {
             );
             GpuTextureView motionView = transaction.own(
                 device.createTextureView(motionTexture)
-            );
-            GpuTexture historyBiasTexture = transaction.own(
-                device.createTexture(
-                    "NVIDIA DLSS / Local Player History Bias",
-                    15 | DlssRenderer.STORAGE_USAGE,
-                    GpuFormat.RGBA8_UNORM,
-                    lowWidth,
-                    lowHeight,
-                    1,
-                    1
-                )
-            );
-            GpuTextureView historyBiasView = transaction.own(
-                device.createTextureView(historyBiasTexture)
             );
             GpuTexture depthDebugTexture = null;
             GpuTextureView depthDebugView = null;
@@ -253,8 +233,6 @@ final class DlssAuxiliaryResources {
             DlssAuxiliaryResources result = new DlssAuxiliaryResources(
                 motionTexture,
                 motionView,
-                historyBiasTexture,
-                historyBiasView,
                 depthDebugTexture,
                 depthDebugView,
                 motionDebugTexture,
@@ -299,8 +277,6 @@ final class DlssAuxiliaryResources {
         return !this.closed
             && !this.motionTexture.isClosed()
             && !this.motionView.isClosed()
-            && !this.historyBiasTexture.isClosed()
-            && !this.historyBiasView.isClosed()
             && openOrAbsent(this.depthDebugTexture)
             && openOrAbsent(this.depthDebugView)
             && openOrAbsent(this.motionDebugTexture)
@@ -361,8 +337,6 @@ final class DlssAuxiliaryResources {
         fullyClosed &= close(this.motionDebugTexture);
         fullyClosed &= close(this.depthDebugView);
         fullyClosed &= close(this.depthDebugTexture);
-        fullyClosed &= close(this.historyBiasView);
-        fullyClosed &= close(this.historyBiasTexture);
         fullyClosed &= close(this.motionView);
         fullyClosed &= close(this.motionTexture);
         if (retainLease) {

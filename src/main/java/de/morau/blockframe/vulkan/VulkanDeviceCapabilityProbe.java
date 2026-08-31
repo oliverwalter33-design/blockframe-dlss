@@ -123,9 +123,7 @@ public final class VulkanDeviceCapabilityProbe {
                     vulkan12Features.timelineSemaphore(),
                     vulkan12Features.descriptorIndexing(),
                     vulkan12Features.bufferDeviceAddress(),
-                    vulkan12Features.shaderFloat16(),
-                    features.features()
-                        .shaderStorageImageWriteWithoutFormat()
+                    vulkan12Features.shaderFloat16()
                 ),
                 physicalDevice.vkPhysicalDeviceProperties().apiVersion(),
                 physicalDevice.vkPhysicalDeviceProperties().vendorID(),

@@ -19,7 +19,6 @@ import de.morau.nvidiadlss.nativebridge.StreamlineFeatureRequirements;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
-import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
 import org.lwjgl.vulkan.VkPhysicalDeviceVulkan12Features;
 
 public final class DlssBootstrap {
@@ -258,14 +257,6 @@ public final class DlssBootstrap {
             DlssVulkanCapabilityNegotiator.SHADER_FLOAT16_FEATURE,
             VkPhysicalDeviceVulkan12Features.SHADERFLOAT16
         );
-        addVulkan10Feature(
-            enabledFeatures,
-            selection.enabledFeatures(),
-            DlssVulkanCapabilityNegotiator
-                .SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT_FEATURE,
-            VkPhysicalDeviceFeatures
-                .SHADERSTORAGEIMAGEWRITEWITHOUTFORMAT
-        );
         deviceRequirementsReady = true;
         capabilityReason = report.reason();
         BlockframeRuntime.engine()
@@ -292,24 +283,6 @@ public final class DlssBootstrap {
         enabledFeatures.add(
             new VulkanFeature(
                 VulkanBackend.VK12_FEATURES_STRUCT,
-                name,
-                offset
-            )
-        );
-    }
-
-    private static void addVulkan10Feature(
-        Set<VulkanFeature> enabledFeatures,
-        Set<String> selectedFeatures,
-        String name,
-        int offset
-    ) {
-        if (!selectedFeatures.contains(name)) {
-            return;
-        }
-        enabledFeatures.add(
-            new VulkanFeature(
-                VulkanBackend.VK10_FEATURES_STRUCT,
                 name,
                 offset
             )

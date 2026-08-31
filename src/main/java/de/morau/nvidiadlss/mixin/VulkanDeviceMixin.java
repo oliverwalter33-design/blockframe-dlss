@@ -12,7 +12,6 @@ import de.morau.blockframe.render.terrain.nativeengine
     .NativeTerrainBackendFoundation;
 import de.morau.nvidiadlss.DlssBootstrap;
 import de.morau.nvidiadlss.DlssRenderer;
-import de.morau.nvidiadlss.VulkanSamplerDeviceLimits;
 import java.util.Set;
 import org.lwjgl.vulkan.VkDevice;
 import org.spongepowered.asm.mixin.Mixin;
@@ -23,45 +22,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Productive Vulkan/DLSS lifecycle only. */
 @Mixin(VulkanDevice.class)
-public abstract class VulkanDeviceMixin
-    implements VulkanSamplerDeviceLimits {
+public abstract class VulkanDeviceMixin {
     @Unique
     private boolean blockframe$dlssCloseStarted;
-    @Unique
-    private float blockframe$maxSamplerLodBias = Float.NaN;
-
-    @Inject(
-        method = "<init>",
-        at = @At(
-            value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/vulkan/VulkanPhysicalDevice;close()V",
-            shift = At.Shift.BEFORE
-        ),
-        require = 1
-    )
-    private void blockframe$captureSamplerLimits(
-        ShaderSource shaderSource,
-        VulkanInstance instance,
-        VulkanPhysicalDevice physicalDevice,
-        Set<String> enabledExtensions,
-        VkDevice vkDevice,
-        long vma,
-        CheckpointExtension checkpointExtension,
-        CallbackInfo ci
-    ) {
-        float maximum = physicalDevice
-            .vkPhysicalDeviceProperties()
-            .limits()
-            .maxSamplerLodBias();
-        if (Float.isFinite(maximum) && maximum >= 0.0F) {
-            this.blockframe$maxSamplerLodBias = maximum;
-        }
-    }
-
-    @Override
-    public float blockframe$maxSamplerLodBias() {
-        return this.blockframe$maxSamplerLodBias;
-    }
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void nvidiaDlss$connectStreamline(

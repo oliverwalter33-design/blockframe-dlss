@@ -27,18 +27,6 @@ class Phase1a8HotPathSourceContractTest {
         "src/main/java/de/morau/nvidiadlss/mixin/";
 
     private static final Set<String> WARMED_NORMAL_HOOKS = Set.of(
-        "BricksCompositeBlockEntityDistanceMixin#"
-            + "blockframe$beginBricksFarExtraction",
-        "BricksCompositeBlockEntityDistanceMixin#"
-            + "blockframe$bricksCompositeViewDistance",
-        "BricksCompositeBlockEntityDistanceMixin#"
-            + "blockframe$extractBricksCompositeFarLod",
-        "BricksFarLodLevelRendererMixin#"
-            + "blockframe$beginBricksFarSubmission",
-        "BricksFarLodLevelRendererMixin#"
-            + "blockframe$queueBricksFarState",
-        "BricksFarLodLevelRendererMixin#"
-            + "blockframe$flushBricksFarSubmission",
         "GameRendererMixin#blockframe$guardMeasuredFrame",
         "GameRendererMixin#nvidiaDlss$useLowResolutionWorldTarget",
         "GameRendererMixin#nvidiaDlss$applyWorldJitter",
@@ -110,7 +98,6 @@ class Phase1a8HotPathSourceContractTest {
         "VulkanConstMixin#nvidiaDlss$addStorageUsage",
         "VulkanCommandEncoderLifecycleMixin#"
             + "blockframe$releaseStreamlineBeforeResourceDestroy",
-        "VulkanDeviceMixin#blockframe$captureSamplerLimits",
         "VulkanDeviceMixin#nvidiaDlss$connectStreamline",
         "VulkanDeviceMixin#blockframe$prepareDeviceClose",
         "VulkanDeviceMixin#blockframe$finishDeviceClose",
@@ -139,7 +126,8 @@ class Phase1a8HotPathSourceContractTest {
         );
 
     private static final Set<String> WARMED_NORMAL_HELPERS = Set.of(
-        "GameRendererMixin#nvidiaDlss$renderNativeBlockOutline"
+        "GameRendererMixin#nvidiaDlss$renderNativeBlockOutline",
+        "VulkanRenderPassMixin#nvidiaDlss$containsIgnoreCase"
     );
 
     private static final Pattern HOOK_ANNOTATION = Pattern.compile(

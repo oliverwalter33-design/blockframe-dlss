@@ -38,7 +38,9 @@ record DlssResourceFootprint(long requestedBytes, long committedBytes) {
         long committed = 0L;
 
         // Low world color/depth, dense RG16F motion and the supported
-        // transparency/composition hint: 16 bytes per render pixel.
+        // transparency/composition hint: 16 bytes per render pixel. The
+        // rejected depth-history gate and unsupported history-bias image are not
+        // allocated by the normal or diagnostic path.
         for (int index = 0; index < 4; index++) {
             long imageBytes = Math.multiplyExact(lowPixels, 4L);
             requested = Math.addExact(requested, imageBytes);
@@ -47,15 +49,6 @@ record DlssResourceFootprint(long requestedBytes, long committedBytes) {
                 align(imageBytes, IMAGE_ALIGNMENT)
             );
         }
-        // Streamline BiasCurrentColorHint for local-player disocclusions only.
-        // RGBA8_UNORM is four additional bytes per render pixel. Streamline
-        // 2.12's Vulkan reverse format mapping does not accept R8_UNORM.
-        long historyBiasBytes = Math.multiplyExact(lowPixels, 4L);
-        requested = Math.addExact(requested, historyBiasBytes);
-        committed = Math.addExact(
-            committed,
-            align(historyBiasBytes, IMAGE_ALIGNMENT)
-        );
         // Depth/motion visualization and R8_UINT classification exist only
         // in an explicitly enabled developer process. The release descriptor
         // layout has no debug bindings and therefore needs no dummy images.

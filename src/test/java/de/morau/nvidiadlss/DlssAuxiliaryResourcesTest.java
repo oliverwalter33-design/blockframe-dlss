@@ -19,7 +19,6 @@ class DlssAuxiliaryResourcesTest {
         );
 
         assertTrue(complete.contains("!this.motionView.isClosed()"));
-        assertTrue(complete.contains("!this.historyBiasView.isClosed()"));
         assertTrue(complete.contains("openOrAbsent(this.depthDebugView)"));
         assertTrue(complete.contains("openOrAbsent(this.motionDebugView)"));
         assertTrue(complete.contains("openOrAbsent(this.motionValidityView)"));
@@ -27,9 +26,7 @@ class DlssAuxiliaryResourcesTest {
         assertTrue(complete.contains("!this.outputView.isClosed()"));
         assertTrue(complete.contains("!this.sharpenView.isClosed()"));
         assertFalse(source().contains("previousDepthTexture"));
-        assertTrue(source().contains("GpuFormat.RGBA8_UNORM"));
-        assertFalse(source().contains("GpuFormat.R8_UNORM"));
-        assertTrue(source().contains("developerDiagnostics ? 16 : 10"));
+        assertFalse(source().contains("historyBiasTexture"));
     }
 
     @Test

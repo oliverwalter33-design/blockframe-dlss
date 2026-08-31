@@ -40,34 +40,6 @@ class Phase1a12RuntimeSourceContractTest {
     }
 
     @Test
-    void sodiumTerrainOwnershipSkipsUnusedNativePipelineRegistration()
-        throws Exception {
-        String mod = source(
-            "src/main/java/de/morau/nvidiadlss/NvidiaDlssMod.java"
-        );
-        String constructor = section(
-            mod,
-            "public NvidiaDlssMod(",
-            "private static void registerGuiLayers("
-        );
-
-        int compatibilityProbe = constructor.indexOf(
-            "boolean sodiumPresent ="
-        );
-        int guard = constructor.indexOf("if (!sodiumPresent) {");
-        int registration = constructor.indexOf(
-            "modBus.addListener(NativeTerrainPipelines::register);"
-        );
-        assertTrue(compatibilityProbe >= 0);
-        assertTrue(guard > compatibilityProbe);
-        assertTrue(registration > guard);
-        assertTrue(
-            constructor.substring(guard, registration).indexOf('}') < 0,
-            "native pipeline registration must remain inside the Sodium guard"
-        );
-    }
-
-    @Test
     void persistenceIsBoundedSeparateAndHasNoShutdownHook()
         throws Exception {
         String runtime = source(

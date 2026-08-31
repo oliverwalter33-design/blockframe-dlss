@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
 import de.morau.blockframe.vulkan.VulkanDeviceFaultHookHealth;
-import de.morau.nvidiadlss.BricksCompatibility;
 import de.morau.nvidiadlss.DeveloperDiagnostics;
 import de.morau.nvidiadlss.SodiumCompatibility;
 import net.neoforged.fml.loading.FMLLoader;
@@ -22,13 +21,6 @@ public final class DlssMixinPlugin implements IMixinConfigPlugin {
     @Override public void onLoad(String mixinPackage) {}
     @Override public String getRefMapperConfig() { return null; }
     @Override public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (BricksCompatibility.isBricksMixin(mixinClassName)) {
-            return BricksCompatibility.isExpectedMixinTarget(
-                    mixinClassName,
-                    targetClassName
-                )
-                && BricksCompatibility.mixinAllowed();
-        }
         return shouldApplyMixinForEnvironment(
             mixinClassName,
             sodiumPresent()
@@ -51,9 +43,6 @@ public final class DlssMixinPlugin implements IMixinConfigPlugin {
         boolean sodiumPresent,
         boolean developerDiagnostics
     ) {
-        if (BricksCompatibility.isBricksMixin(mixinClassName)) {
-            return BricksCompatibility.mixinAllowed();
-        }
         if (isDeveloperDiagnosticsMixin(mixinClassName)) {
             return developerDiagnostics;
         }

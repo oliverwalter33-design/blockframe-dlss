@@ -16,7 +16,6 @@ layout(set = 0, binding = 2, rg16f) uniform writeonly image2D MotionOutput;
 layout(set = 0, binding = 4, rgba8) uniform writeonly image2D DepthDebugOutput;
 layout(set = 0, binding = 5, rgba8) uniform writeonly image2D MotionDebugOutput;
 #endif
-layout(set = 0, binding = 6, rgba8) uniform writeonly image2D HistoryBiasOutput;
 layout(set = 0, binding = 7, rgba8) uniform writeonly image2D TransparencyHintOutput;
 layout(set = 0, binding = 8) uniform sampler2D CurrentColor;
 #if BLOCKFRAME_DEVELOPER_DIAGNOSTICS
@@ -36,13 +35,6 @@ struct ArticulatedPart {
     mat4 previousLocalToWorld;
     vec4 localBoundsMin;
     vec4 localBoundsMax;
-    // Current-frame projected cube rectangle in normalized unjittered UV.
-    // It remains in the fixed transport layout for paired projection checks;
-    // history rejection deliberately does not subtract this coarse AABB.
-    vec4 currentRectUv;
-    // Previous-frame projected cube rectangle in normalized UV, expanded by
-    // one input pixel. min > max means that this part contributes no mask.
-    vec4 historyRejectRectUv;
 };
 
 layout(std140, set = 0, binding = 3) uniform FrameData {
@@ -61,9 +53,6 @@ layout(std140, set = 0, binding = 3) uniform FrameData {
     vec4 articulatedBoundsMax;
     // x = part count, y = capture overflow (exact path disabled if non-zero).
     ivec4 articulatedFlags;
-    // Union of all valid part historyRejectRectUv values. This makes the
-    // common non-player path one rectangle comparison instead of 96.
-    vec4 articulatedHistoryRejectRectUv;
     MotionObject objects[64];
     ArticulatedPart articulatedParts[96];
 } frame;
@@ -229,48 +218,6 @@ void writeTransparencyHint(ivec2 pixel) {
     imageStore(TransparencyHintOutput, pixel, vec4(hint));
 }
 
-float articulatedDisocclusionBias(vec2 previousUv, uint motionClass) {
-    if (
-        motionClass != MOTION_CLASS_WORLD
-            || frame.flags.y != 0
-            || frame.articulatedFlags.x <= 0
-            || frame.articulatedFlags.y != 0
-    ) {
-        return 0.0;
-    }
-    vec4 envelope = frame.articulatedHistoryRejectRectUv;
-    if (
-        envelope.x > envelope.z
-            || envelope.y > envelope.w
-            || previousUv.x < envelope.x
-            || previousUv.y < envelope.y
-            || previousUv.x > envelope.z
-            || previousUv.y > envelope.w
-    ) {
-        return 0.0;
-    }
-
-    int partCount = clamp(frame.articulatedFlags.x, 0, 96);
-    for (int index = 0; index < partCount; ++index) {
-        ArticulatedPart part = frame.articulatedParts[index];
-        vec4 previousRect = part.historyRejectRectUv;
-        bool previousInside = previousRect.x <= previousRect.z
-            && previousRect.y <= previousRect.w
-            && previousUv.x >= previousRect.x
-            && previousUv.y >= previousRect.y
-            && previousUv.x <= previousRect.z
-            && previousUv.y <= previousRect.w;
-        if (previousInside) {
-            // Streamline's BiasCurrentColorHint uses 1 to reject temporal
-            // history completely at this current WORLD pixel. Current player
-            // pixels are already classified as ARTICULATED_PLAYER, so a
-            // current projected AABB must not erase real limb disocclusions.
-            return 1.0;
-        }
-    }
-    return 0.0;
-}
-
 void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = ivec2(frame.renderSizeAndCurrentJitter.xy);
@@ -283,7 +230,6 @@ void main() {
     // behind them instead of borrowing a nearby grass/leaf sample.
     float depth = texelFetch(CurrentDepth, pixel, 0).r;
     writeTransparencyHint(pixel);
-    imageStore(HistoryBiasOutput, pixel, vec4(0.0));
 #if BLOCKFRAME_DEVELOPER_DIAGNOSTICS
     if (frame.flags.w != 0) {
         float visibleDepth = pow(clamp(depth, 0.0, 1.0), 0.25);
@@ -394,14 +340,6 @@ void main() {
         return;
     }
     vec2 previousUv = previousNdc.xy * 0.5 + 0.5;
-    imageStore(
-        HistoryBiasOutput,
-        pixel,
-        vec4(articulatedDisocclusionBias(
-            previousUv,
-            resolvedMotionClass
-        ))
-    );
     vec2 motionPixels = (previousUv - currentUv) * vec2(size);
     if (
         resolvedMotionClass == MOTION_CLASS_WORLD

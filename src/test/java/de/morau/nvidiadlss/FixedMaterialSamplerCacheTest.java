@@ -34,7 +34,7 @@ class FixedMaterialSamplerCacheTest {
         FakeSampler original = new FakeSampler();
         int[] creates = new int[1];
         FixedMaterialSamplerCache.SamplerFactory factory =
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) -> {
+            (device, u, v, min, mag, anisotropy, maxLod, bias) -> {
                 creates[0]++;
                 return new FakeSampler();
             };
@@ -64,62 +64,6 @@ class FixedMaterialSamplerCacheTest {
     }
 
     @Test
-    void fullDescriptorParticipatesInTheCacheKey() {
-        FixedMaterialSamplerCache cache = cache(
-            new FakeLeaseController(),
-            new ShaderResourceInventory(),
-            4
-        );
-        FakeSampler original = new FakeSampler();
-        Descriptor firstDescriptor = new Descriptor(2);
-        Descriptor equalDescriptor = new Descriptor(2);
-        Descriptor differentDescriptor = new Descriptor(3);
-        int[] creates = new int[1];
-        FixedMaterialSamplerCache.SamplerFactory factory =
-            (
-                device,
-                descriptor,
-                u,
-                v,
-                min,
-                mag,
-                anisotropy,
-                maxLod,
-                bias
-            ) -> {
-                creates[0]++;
-                return new FakeSampler();
-            };
-
-        Object first = select(
-            cache,
-            original,
-            firstDescriptor,
-            -1.25F,
-            factory
-        );
-        Object equal = select(
-            cache,
-            original,
-            equalDescriptor,
-            -1.25F,
-            factory
-        );
-        Object different = select(
-            cache,
-            original,
-            differentDescriptor,
-            -1.25F,
-            factory
-        );
-
-        assertSame(first, equal);
-        assertNotSame(first, different);
-        assertEquals(2, creates[0]);
-        assertEquals(2, cache.slotCount());
-    }
-
-    @Test
     void factoryFailureIsMemoizedForTheExactKey() {
         FakeLeaseController leases = new FakeLeaseController();
         ShaderResourceInventory inventory =
@@ -132,7 +76,7 @@ class FixedMaterialSamplerCacheTest {
         FakeSampler original = new FakeSampler();
         int[] attempts = new int[1];
         FixedMaterialSamplerCache.SamplerFactory failing =
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) -> {
+            (device, u, v, min, mag, anisotropy, maxLod, bias) -> {
                 attempts[0]++;
                 throw new OutOfMemoryError("injected");
             };
@@ -167,7 +111,7 @@ class FixedMaterialSamplerCacheTest {
         FakeSampler original = new FakeSampler();
         int[] creates = new int[1];
         FixedMaterialSamplerCache.SamplerFactory factory =
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) -> {
+            (device, u, v, min, mag, anisotropy, maxLod, bias) -> {
                 creates[0]++;
                 return new FakeSampler();
             };
@@ -199,7 +143,7 @@ class FixedMaterialSamplerCacheTest {
         );
         FakeSampler original = new FakeSampler();
         FixedMaterialSamplerCache.SamplerFactory factory =
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) ->
+            (device, u, v, min, mag, anisotropy, maxLod, bias) ->
                 new FakeSampler();
 
         select(cache, original, -0.75F, factory);
@@ -243,7 +187,6 @@ class FixedMaterialSamplerCacheTest {
                 -0.75F - index,
                 (
                     device,
-                    descriptor,
                     u,
                     v,
                     min,
@@ -279,7 +222,7 @@ class FixedMaterialSamplerCacheTest {
             4,
             OptionalDouble.of(0.0D),
             -1.0F,
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) -> {
+            (device, u, v, min, mag, anisotropy, maxLod, bias) -> {
                 creates[0]++;
                 return new FakeSampler();
             },
@@ -307,7 +250,7 @@ class FixedMaterialSamplerCacheTest {
             cache,
             original,
             -1.0F,
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) ->
+            (device, u, v, min, mag, anisotropy, maxLod, bias) ->
                 created
         );
 
@@ -351,7 +294,7 @@ class FixedMaterialSamplerCacheTest {
             cache,
             original,
             -1.0F,
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) ->
+            (device, u, v, min, mag, anisotropy, maxLod, bias) ->
                 created
         );
 
@@ -386,7 +329,7 @@ class FixedMaterialSamplerCacheTest {
             cache,
             original,
             -1.0F,
-            (device, descriptor, u, v, min, mag, anisotropy, maxLod, bias) ->
+            (device, u, v, min, mag, anisotropy, maxLod, bias) ->
                 created
         );
 
@@ -452,28 +395,6 @@ class FixedMaterialSamplerCacheTest {
         );
     }
 
-    private static Object select(
-        FixedMaterialSamplerCache cache,
-        Object original,
-        Object descriptor,
-        float bias,
-        FixedMaterialSamplerCache.SamplerFactory factory
-    ) {
-        return cache.select(
-            original,
-            descriptor,
-            ADDRESS_U,
-            ADDRESS_V,
-            MIN_FILTER,
-            MAG_FILTER,
-            4,
-            OptionalDouble.of(12.0D),
-            bias,
-            factory,
-            NO_OBSERVER
-        );
-    }
-
     private static FixedMaterialSamplerCache cache(
         FakeLeaseController leases,
         ShaderResourceInventory inventory,
@@ -525,8 +446,5 @@ class FixedMaterialSamplerCacheTest {
                 );
             }
         }
-    }
-
-    private record Descriptor(int addressModeW) {
     }
 }

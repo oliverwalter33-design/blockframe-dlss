@@ -5,11 +5,10 @@ import java.util.Map;
 /**
  * Release contract for optional DLSS temporal inputs.
  *
- * <p>The pinned Streamline/DLSS runtime receives the supported transparency
- * hint plus a production-owned BiasCurrentColorHint mask restricted to exact
- * local-player disocclusions. Historical diagnostic overrides and
- * motion-fallback switches are intentionally not parsed, even with developer
- * diagnostics enabled, so they cannot broaden that mask.</p>
+ * <p>The pinned Streamline/DLSS runtime receives only the supported
+ * transparency hint. Historical experimental hint and motion-fallback
+ * switches are intentionally not parsed, even with developer diagnostics
+ * enabled, so they cannot alter a game frame.</p>
  */
 final class TemporalHintAudit {
     record Policy() {
@@ -33,9 +32,7 @@ final class TemporalHintAudit {
     }
 
     static String metadataJson() {
-        return "{\"optionalInputs\":[\"BiasCurrentColorHint(local-player)\","
-            + "\"TransparencyHint\"],"
-            + "\"historyBiasScope\":\"exact-articulated-player-disocclusion\","
+        return "{\"optionalInput\":\"TransparencyHint\","
             + "\"experimentalHintOverrides\":false,"
             + "\"motionFallbackOverride\":false}";
     }

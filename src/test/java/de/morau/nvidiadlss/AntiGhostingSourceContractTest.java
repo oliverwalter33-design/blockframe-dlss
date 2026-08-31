@@ -12,28 +12,24 @@ class AntiGhostingSourceContractTest {
     private static final float MAX_FINITE_MOTION_COMPONENT = 65_024.0F;
 
     @Test
-    void nativeBridgeTagsSupportedLocalizedHistoryAndTransparencyHints() throws Exception {
+    void nativeBridgeTagsOnlyTheSupportedOptionalTransparencyHint() throws Exception {
         String source = source("native/nvidia_dlss_bridge.cpp");
-        assertTrue(source.contains("kBufferTypeBiasCurrentColorHint"));
+        assertTrue(!source.contains("kBufferTypeBiasCurrentColorHint"));
         assertTrue(!source.contains("kBufferTypeInvalidDepthMotionHint"));
-        assertTrue(source.contains("sl::Resource historyBias"));
-        assertTrue(source.contains("historyBiasImage, historyBiasView, inputWidth, inputHeight, VK_FORMAT_R8G8B8A8_UNORM"));
-        assertTrue(!source.contains("VK_FORMAT_R8_UNORM"));
+        assertTrue(!source.contains("sl::Resource historyBias"));
         assertTrue(source.contains("makeImage(transparencyHintImage, transparencyHintView, inputWidth, inputHeight, VK_FORMAT_R8G8B8A8_UNORM"));
-        assertTrue(source.contains("{&historyBias, sl::kBufferTypeBiasCurrentColorHint"));
         assertTrue(source.contains("{&transparencyHint, sl::kBufferTypeTransparencyHint"));
         assertTrue(source.contains("auditHintMode == 1"));
-        assertTrue(source.contains("inputsWithTransparency"));
-        assertTrue(source.contains("inputsWithoutTransparency"));
-        assertTrue(source.contains("includeTransparencyHint ? 7u : 6u"));
-        assertTrue(!source.contains("static_cast<void>(historyBiasImage)"));
-        assertTrue(!source.contains("static_cast<void>(historyBiasView)"));
+        assertTrue(source.contains("tagsWithTransparency, 5"));
+        assertTrue(source.contains("tagsWithoutTransparency, 4"));
+        assertTrue(source.contains("static_cast<void>(historyBiasImage)"));
+        assertTrue(source.contains("static_cast<void>(historyBiasView)"));
         assertTrue(source.contains("constants.cameraMotionIncluded = sl::Boolean::eTrue"));
         assertTrue(source.contains("constants.motionVectorsJittered = sl::Boolean::eFalse"));
     }
 
     @Test
-    void shaderWritesDenseMotionAndOnlyLocalPlayerDisocclusionBias() throws Exception {
+    void shaderWritesDenseOwnPixelMotionWithoutHistoryGating() throws Exception {
         String source = source("native/shaders/motion_vectors.comp");
         assertTrue(source.contains("frame.flags.y != 0"));
         assertTrue(source.contains(
@@ -48,22 +44,8 @@ class AntiGhostingSourceContractTest {
         assertTrue(!source.contains("PreviousDepth"));
         assertTrue(!source.contains("previousDepthNeighborhoodMatches"));
         assertTrue(!source.contains("findCutoutNeighbor"));
-        assertTrue(source.contains("binding = 6, rgba8"));
-        assertTrue(source.contains("HistoryBiasOutput"));
-        assertTrue(source.contains(
-            "float articulatedDisocclusionBias(vec2 previousUv, uint motionClass)"
-        ));
-        assertTrue(source.contains("previousUv,"));
-        assertTrue(source.contains("motionClass != MOTION_CLASS_WORLD"));
-        assertTrue(source.contains("frame.flags.y != 0"));
-        assertTrue(source.contains("frame.articulatedFlags.y != 0"));
-        assertTrue(source.contains("ArticulatedPart part = frame.articulatedParts[index]"));
-        assertTrue(source.contains("vec4 previousRect = part.historyRejectRectUv"));
-        assertTrue(source.contains("if (previousInside)"));
-        assertTrue(!source.contains("bool currentInside"));
-        assertTrue(source.contains("imageStore(HistoryBiasOutput, pixel, vec4(0.0))"));
-        assertTrue(!source.contains("historyBiasForMotion"));
-        assertTrue(!source.contains("trailingDisocclusionBias"));
+        assertTrue(!source.contains("HistoryBiasOutput"));
+        assertTrue(!source.contains("binding = 6"));
         assertTrue(source.contains("binding = 7, rgba8"));
         assertTrue(source.contains("const float compositionMarkerAlpha = 253.0 / 255.0"));
         assertTrue(source.contains("const float particleMarkerAlpha = 252.0 / 255.0"));

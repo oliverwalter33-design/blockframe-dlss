@@ -83,7 +83,6 @@ public final class DlssDebugCapture {
         GpuTexture depthDebug,
         GpuTexture motionDebug,
         GpuTexture motionValidity,
-        GpuTexture historyBias,
         GpuTexture transparencyHint
     ) {
         if (!DeveloperDiagnostics.enabled()) {
@@ -189,20 +188,6 @@ public final class DlssDebugCapture {
             );
             captureMaskTexture(
                 encoder,
-                historyBias,
-                inputRegion,
-                directory.resolve(base + "_D0_player_history_bias.png"),
-                "D0 local-player BiasCurrentColorHint"
-            );
-            captureRawTexture(
-                encoder,
-                historyBias,
-                inputRegion,
-                directory.resolve(base + "_D0_player_history_bias_rgba8.bin"),
-                "D0 raw RGBA8 local-player BiasCurrentColorHint"
-            );
-            captureMaskTexture(
-                encoder,
                 transparencyHint,
                 inputRegion,
                 directory.resolve(base + "_D_transparency_hint.png"),
@@ -248,8 +233,8 @@ public final class DlssDebugCapture {
             encoder,
             dlssOutput,
             session.outputRegion,
-            session.directory.resolve(session.base + "_E_post_sl_output.png"),
-            "E immediate Streamline DLSS/DLAA output"
+            session.directory.resolve(session.base + "_E_post_sl_dlaa.png"),
+            "E immediate DLAA output"
         );
         if (appliedSharpness > 0.0F) {
             captureRgbaTexture(
@@ -402,8 +387,7 @@ public final class DlssDebugCapture {
         int pixelSize = texture.getFormat().blockSize();
         if (pixelSize != 4) {
             throw new IllegalArgumentException(
-                label + " erwartet RGBA8, erhielt "
-                    + texture.getFormat()
+                label + " erwartet RGBA8, erhielt " + texture.getFormat()
             );
         }
         GpuBuffer buffer = RenderSystem.getDevice().createBuffer(
@@ -737,7 +721,7 @@ public final class DlssDebugCapture {
                     + "  \"outputRegion\": %s,\n"
                     + "  \"stages\": {\"A\":\"pre-sl color\",\"B\":\"pre-sl depth\","
                     + "\"C\":\"pre-sl motion plus R8_UINT validity/ownership\",\"D\":\"pre-sl hints\","
-                    + "\"E\":\"immediate Streamline DLSS/DLAA output\",\"F0\":\"post renderLevel before entity outline\"," 
+                    + "\"E\":\"immediate DLAA output\",\"F0\":\"post renderLevel before entity outline\","
                     + "\"F\":\"exact source texture passed to WindowSurface.blitFromTexture\"},\n"
                     + "  \"renderer\": %s\n}\n",
                 this.frame,
