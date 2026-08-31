@@ -1,5 +1,7 @@
 # BlockFrame DLSS
 
+[![Source provenance](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/source-provenance.yml/badge.svg)](https://github.com/oliverwalter33-design/blockframe-dlss/actions/workflows/source-provenance.yml)
+
 BlockFrame DLSS is an experimental client-side NeoForge mod that integrates NVIDIA DLSS Super Resolution and DLAA into Minecraft 26.2's native Vulkan renderer.
 
 > **Experimental:** image quality, compatibility and performance can vary by GPU, driver, resolution, resource pack, shader pack and other rendering mods.
