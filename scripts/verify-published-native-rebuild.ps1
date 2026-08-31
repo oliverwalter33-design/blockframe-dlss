@@ -6,6 +6,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Project = Split-Path -Parent $PSScriptRoot
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Assert-Sha256 {
     param(
@@ -23,6 +24,231 @@ function Assert-Sha256 {
         throw "SHA-256 mismatch for ${Path}: expected $Expected, got $actual"
     }
     Write-Host "SHA-256 OK: $($item.Name) = $actual"
+}
+
+function Copy-ZipEntry {
+    param(
+        [Parameter(Mandatory = $true)][string]$ArchivePath,
+        [Parameter(Mandatory = $true)][string]$EntryName,
+        [Parameter(Mandatory = $true)][string]$DestinationPath
+    )
+
+    $archive = [IO.Compression.ZipFile]::OpenRead(
+        (Resolve-Path -LiteralPath $ArchivePath).Path
+    )
+    try {
+        $entry = $archive.GetEntry($EntryName)
+        if ($null -eq $entry) {
+            throw "Archive is missing $EntryName"
+        }
+        $parent = Split-Path -Parent $DestinationPath
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+        $input = $entry.Open()
+        $output = [IO.File]::Create($DestinationPath)
+        try {
+            $input.CopyTo($output)
+        } finally {
+            $output.Dispose()
+            $input.Dispose()
+        }
+    } finally {
+        $archive.Dispose()
+    }
+}
+
+function Assert-ByteRange {
+    param(
+        [Parameter(Mandatory = $true)][byte[]]$Bytes,
+        [Parameter(Mandatory = $true)][long]$Offset,
+        [Parameter(Mandatory = $true)][long]$Length,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    if ($Offset -lt 0 -or $Length -lt 0 -or
+        $Offset -gt $Bytes.LongLength -or
+        $Length -gt ($Bytes.LongLength - $Offset)) {
+        throw "Invalid $Label range: offset=$Offset length=$Length fileLength=$($Bytes.LongLength)"
+    }
+}
+
+function Get-ByteArraySha256 {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-NormalizedBridgeImage {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $resolved = (Resolve-Path -LiteralPath $Path).Path
+    $bytes = [IO.File]::ReadAllBytes($resolved)
+    if ($bytes.LongLength -ne 558592) {
+        throw "Unexpected bridge length for ${Path}: expected 558592, got $($bytes.LongLength)"
+    }
+
+    Assert-ByteRange -Bytes $bytes -Offset 0x3c -Length 4 -Label 'DOS e_lfanew'
+    $peOffset = [long][BitConverter]::ToUInt32($bytes, 0x3c)
+    Assert-ByteRange -Bytes $bytes -Offset $peOffset -Length 24 -Label 'PE/COFF header'
+    if ($bytes[$peOffset] -ne 0x50 -or $bytes[$peOffset + 1] -ne 0x45 -or
+        $bytes[$peOffset + 2] -ne 0 -or $bytes[$peOffset + 3] -ne 0) {
+        throw "Missing PE signature in $Path"
+    }
+
+    $sectionCount = [int][BitConverter]::ToUInt16($bytes, [int]($peOffset + 6))
+    $optionalHeaderSize = [int][BitConverter]::ToUInt16($bytes, [int]($peOffset + 20))
+    if ($sectionCount -le 0 -or $optionalHeaderSize -le 0) {
+        throw "Invalid PE section/optional-header counts in $Path"
+    }
+    $optionalHeaderOffset = $peOffset + 24
+    Assert-ByteRange -Bytes $bytes -Offset $optionalHeaderOffset -Length $optionalHeaderSize -Label 'PE optional header'
+    $magic = [BitConverter]::ToUInt16($bytes, [int]$optionalHeaderOffset)
+    if ($magic -eq 0x20b) {
+        $numberOfRvaAndSizesOffset = $optionalHeaderOffset + 108
+        $dataDirectoryOffset = $optionalHeaderOffset + 112
+    } elseif ($magic -eq 0x10b) {
+        $numberOfRvaAndSizesOffset = $optionalHeaderOffset + 92
+        $dataDirectoryOffset = $optionalHeaderOffset + 96
+    } else {
+        throw ('Unsupported PE optional-header magic 0x{0:x} in {1}' -f $magic, $Path)
+    }
+
+    Assert-ByteRange -Bytes $bytes -Offset $numberOfRvaAndSizesOffset -Length 4 -Label 'PE data-directory count'
+    $directoryCount = [BitConverter]::ToUInt32($bytes, [int]$numberOfRvaAndSizesOffset)
+    if ($directoryCount -le 6) {
+        throw "PE debug data directory is absent in $Path"
+    }
+    $debugDataDirectoryOffset = $dataDirectoryOffset + (6 * 8)
+    if (($debugDataDirectoryOffset + 8) -gt ($optionalHeaderOffset + $optionalHeaderSize)) {
+        throw "PE debug data directory extends past the optional header in $Path"
+    }
+    $debugRva = [long][BitConverter]::ToUInt32($bytes, [int]$debugDataDirectoryOffset)
+    $debugSize = [long][BitConverter]::ToUInt32($bytes, [int]($debugDataDirectoryOffset + 4))
+    if ($debugRva -eq 0 -or $debugSize -eq 0 -or ($debugSize % 28) -ne 0) {
+        throw "Invalid PE debug directory RVA/size in $Path"
+    }
+
+    $sectionTableOffset = $optionalHeaderOffset + $optionalHeaderSize
+    Assert-ByteRange -Bytes $bytes -Offset $sectionTableOffset -Length (40L * $sectionCount) -Label 'PE section table'
+    $debugDirectoryOffset = $null
+    for ($index = 0; $index -lt $sectionCount; $index++) {
+        $sectionOffset = $sectionTableOffset + (40L * $index)
+        $virtualAddress = [long][BitConverter]::ToUInt32($bytes, [int]($sectionOffset + 12))
+        $rawSize = [long][BitConverter]::ToUInt32($bytes, [int]($sectionOffset + 16))
+        $rawPointer = [long][BitConverter]::ToUInt32($bytes, [int]($sectionOffset + 20))
+        $delta = $debugRva - $virtualAddress
+        if ($delta -ge 0 -and $delta -le $rawSize -and
+            $debugSize -le ($rawSize - $delta)) {
+            if ($null -ne $debugDirectoryOffset) {
+                throw "PE debug directory maps to multiple sections in $Path"
+            }
+            $debugDirectoryOffset = $rawPointer + $delta
+        }
+    }
+    if ($null -eq $debugDirectoryOffset) {
+        throw "PE debug directory cannot be mapped to raw file data in $Path"
+    }
+    Assert-ByteRange -Bytes $bytes -Offset $debugDirectoryOffset -Length $debugSize -Label 'IMAGE_DEBUG_DIRECTORY array'
+
+    $ranges = [Collections.Generic.List[object]]::new()
+    $ranges.Add([pscustomobject]@{
+        Kind = 'COFF TimeDateStamp'
+        Offset = $peOffset + 8
+        Length = 4
+    })
+    $debugEntryCount = [int]($debugSize / 28)
+    $rsdsCount = 0
+    for ($index = 0; $index -lt $debugEntryCount; $index++) {
+        $entryOffset = $debugDirectoryOffset + (28L * $index)
+        $ranges.Add([pscustomobject]@{
+            Kind = "IMAGE_DEBUG_DIRECTORY[$index] TimeDateStamp"
+            Offset = $entryOffset + 4
+            Length = 4
+        })
+
+        $type = [BitConverter]::ToUInt32($bytes, [int]($entryOffset + 12))
+        if ($type -eq 2) {
+            $dataSize = [long][BitConverter]::ToUInt32($bytes, [int]($entryOffset + 16))
+            $dataPointer = [long][BitConverter]::ToUInt32($bytes, [int]($entryOffset + 24))
+            Assert-ByteRange -Bytes $bytes -Offset $dataPointer -Length $dataSize -Label 'CodeView debug data'
+            if ($dataSize -lt 24 -or
+                [Text.Encoding]::ASCII.GetString($bytes, [int]$dataPointer, 4) -ne 'RSDS') {
+                throw "Unsupported CodeView debug record in $Path"
+            }
+            $ranges.Add([pscustomobject]@{
+                Kind = 'RSDS GUID volatile prefix'
+                Offset = $dataPointer + 4
+                Length = 8
+            })
+            $rsdsCount++
+        }
+    }
+
+    $normalizedByteCount = [long](($ranges | Measure-Object -Property Length -Sum).Sum)
+    if ($debugEntryCount -ne 2 -or $rsdsCount -ne 1 -or $normalizedByteCount -ne 20) {
+        throw "Unexpected volatile PE metadata layout in ${Path}: debugEntries=$debugEntryCount rsdsRecords=$rsdsCount normalizedBytes=$normalizedByteCount"
+    }
+
+    $normalized = [byte[]]$bytes.Clone()
+    foreach ($range in $ranges) {
+        Assert-ByteRange -Bytes $normalized -Offset $range.Offset -Length $range.Length -Label $range.Kind
+        [Array]::Clear($normalized, [int]$range.Offset, [int]$range.Length)
+    }
+
+    return [pscustomobject]@{
+        Path = $resolved
+        RawBytes = $bytes
+        NormalizedBytes = $normalized
+        NormalizedSha256 = Get-ByteArraySha256 -Bytes $normalized
+        RangeSignature = (($ranges | Sort-Object Offset | ForEach-Object {
+            "$($_.Offset):$($_.Length):$($_.Kind)"
+        }) -join '|')
+        NormalizedByteCount = $normalizedByteCount
+    }
+}
+
+function Assert-NormalizedBridgeMatch {
+    param(
+        [Parameter(Mandatory = $true)][string]$PublishedPath,
+        [Parameter(Mandatory = $true)][string]$RebuiltPath,
+        [Parameter(Mandatory = $true)][string]$ExpectedNormalizedSha256
+    )
+
+    $published = Get-NormalizedBridgeImage -Path $PublishedPath
+    $rebuilt = Get-NormalizedBridgeImage -Path $RebuiltPath
+    $expected = $ExpectedNormalizedSha256.ToLowerInvariant()
+    if ($published.RangeSignature -ne $rebuilt.RangeSignature) {
+        throw 'Published and rebuilt bridge metadata layouts differ.'
+    }
+    if ($published.NormalizedSha256 -ne $expected) {
+        throw "Published bridge normalized SHA-256 mismatch: expected $expected, got $($published.NormalizedSha256)"
+    }
+    if ($rebuilt.NormalizedSha256 -ne $expected) {
+        throw "Rebuilt bridge normalized SHA-256 mismatch: expected $expected, got $($rebuilt.NormalizedSha256)"
+    }
+
+    $rawDifferenceCount = 0
+    for ($index = 0; $index -lt $published.NormalizedBytes.Length; $index++) {
+        if ($published.NormalizedBytes[$index] -ne $rebuilt.NormalizedBytes[$index]) {
+            throw "Executable bridge content mismatch after metadata normalization at file offset $index"
+        }
+        if ($published.RawBytes[$index] -ne $rebuilt.RawBytes[$index]) {
+            $rawDifferenceCount++
+        }
+    }
+    if ($rawDifferenceCount -gt $published.NormalizedByteCount) {
+        throw "Bridge differs in $rawDifferenceCount raw bytes, beyond the $($published.NormalizedByteCount) explicitly normalized metadata bytes."
+    }
+
+    $rebuiltRawSha256 = (Get-FileHash -LiteralPath $RebuiltPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    Write-Host "Normalized bridge SHA-256 OK: $expected"
+    Write-Host "Normalized PE metadata bytes: $($published.NormalizedByteCount)"
+    Write-Host "Raw differing byte count: $rawDifferenceCount"
+    Write-Host "Raw rebuilt bridge SHA-256 (informational): $rebuiltRawSha256"
 }
 
 function Get-PinnedFile {
@@ -92,6 +318,16 @@ Get-PinnedFile `
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $PSScriptRoot 'verify-native-provenance.ps1') -JarPath $jar0316
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$publishedBridge = Join-Path $WorkDirectory 'published-0.3.18-nvidia_dlss_bridge.dll'
+Copy-ZipEntry `
+    -ArchivePath $jar0318 `
+    -EntryName 'assets/nvidia_dlss/native/win-x64/nvidia_dlss_bridge.dll' `
+    -DestinationPath $publishedBridge
+Assert-Sha256 `
+    -Path $publishedBridge `
+    -Expected 'f1f1f4ec4b7ecc7c85d0f824b3552468e92600ceca76141c8441965a54a407c6' `
+    -ExpectedLength 558592
 
 # Official NVIDIA Streamline SDK 2.12.0 release asset. The staging script also
 # validates every production DLL's NVIDIA Authenticode signature and SHA-256.
@@ -197,10 +433,6 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $currentExpected = [ordered]@{
-    'nvidia_dlss_bridge.dll' = @{
-        Length = 558592
-        Sha256 = 'f1f1f4ec4b7ecc7c85d0f824b3552468e92600ceca76141c8441965a54a407c6'
-    }
     'motion_vectors.comp.spv' = @{
         Length = 15188
         Sha256 = '940687072284efc94f9e3fd4e55c38f7f7593e6ed5e8ebc5bbffb54a73e47551'
@@ -211,6 +443,10 @@ $currentExpected = [ordered]@{
     }
 }
 Assert-OutputSet -Directory $currentOutput -Expected $currentExpected
+Assert-NormalizedBridgeMatch `
+    -PublishedPath $publishedBridge `
+    -RebuiltPath (Join-Path $currentOutput 'nvidia_dlss_bridge.dll') `
+    -ExpectedNormalizedSha256 '34d11bab0460283842e4321a670ddd4da154c4d332236c15ff48aecfd3510d32'
 
 # 0.3.16 used LWJGL's shaderc 3.4.1 binding. Its four Maven Central inputs
 # are pinned below; CompileMotionShaders.java recreates both historical SPVs.
@@ -288,3 +524,4 @@ Write-Host '  An exact bridge rebuild is not claimed because its historical Vulk
 Write-Host '  header inputs were not recorded with archive-level identities in 0.3.16.'
 Write-Host 'Native binary verification completed successfully.'
 Write-Host 'No downloaded or rebuilt binary is uploaded as a workflow artifact.'
+
