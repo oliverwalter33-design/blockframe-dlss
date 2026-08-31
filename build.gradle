@@ -966,6 +966,10 @@ tasks.register('sourceZip', Zip) {
         include 'native/**'
         include 'README.md'
         include 'RELEASE-VERIFICATION-DE.md'
+        include 'MODRINTH-OWNERSHIP.md'
+        include 'MODRINTH-BINARY-PROVENANCE.md'
+        include '.github/**'
+        include 'scripts/**'
         include 'settings.gradle'
         include 'src/**'
         include 'benchmarks/fixtures/blockframe-benchmark-config-v1.json'
@@ -981,3 +985,4 @@ tasks.register('sourceZip', Zip) {
         exclude '**/*.spv'
     }
 }
+
