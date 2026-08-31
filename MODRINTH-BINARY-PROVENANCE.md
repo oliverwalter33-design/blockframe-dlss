@@ -36,6 +36,31 @@ source hashes, output hashes, compiler versions, and shader build defines in
 | `motion_vectors.comp.spv` | `native/shaders/motion_vectors.comp` — `0ff5614444f5adf20ac17d863a2b3e3563c709d8bb7e0c8cf91318b735b14b68` | `glslc --target-env=vulkan1.2 -O -DBLOCKFRAME_DEVELOPER_DIAGNOSTICS=0` | shaderc/glslc `v2026.2` | 15,188 | `940687072284efc94f9e3fd4e55c38f7f7593e6ed5e8ebc5bbffb54a73e47551` |
 | `motion_vectors.debug.comp.spv` | same shader source | `glslc --target-env=vulkan1.2 -O -DBLOCKFRAME_DEVELOPER_DIAGNOSTICS=1` | shaderc/glslc `v2026.2` | 19,080 | `7807fea40ecf2f6e9c74f651f340715dd611365d6775881cb62f16c328820b0a` |
 
+### Exact scope of the 0.3.18 bridge rebuild check
+
+The published bridge is always checked in its original form against its
+558,592-byte size and raw SHA-256
+`f1f1f4ec4b7ecc7c85d0f824b3552468e92600ceca76141c8441965a54a407c6`.
+The two SPIR-V outputs are also reproduced and compared byte-for-byte without
+normalization.
+
+Zig/LLD 0.15.2 writes 20 run-dependent bytes into this historical DLL's
+non-executable PE/CodeView metadata: the four-byte COFF timestamp, two
+four-byte `IMAGE_DEBUG_DIRECTORY` timestamps, and the first eight bytes of
+the RSDS/PDB GUID. The rebuild workflow parses the PE headers and section
+table, requires exactly that metadata layout (two debug-directory entries and
+one RSDS record), and clears only those 20 fields in an in-memory comparison
+copy. It then requires the published and rebuilt images to be byte-identical
+everywhere else and to have this normalized SHA-256:
+
+`34d11bab0460283842e4321a670ddd4da154c4d332236c15ff48aecfd3510d32`
+
+The raw hash of each rebuild is logged for auditability but is not presented
+as a byte-for-byte reproduction of the original metadata. The comparison
+therefore establishes reproducibility of every byte outside the explicitly
+listed volatile provenance fields without weakening the raw hash pin on the
+published artifact.
+
 Before packaging, Gradle's `verifyNativeRuntime` task recomputes these source
 and output hashes and compares them with the checked-in stamp. The `jar` task
 depends on that verification and therefore fails if a generated binary is
@@ -100,7 +125,9 @@ development binaries and stages only the signed production set.
    before any file is copied.
 3. Build the JNI bridge and both SPIR-V variants with
    `native/build-native.ps1`; the script writes source/output/compiler
-   provenance into `native-source-v1.properties`.
+   provenance into `native-source-v1.properties`. The two shaders must match
+   byte-for-byte. The bridge comparison permits only the 20 structurally
+   identified PE/CodeView metadata bytes documented above to vary.
 4. Run `gradle clean test build` with Gradle 9.2.1. Gradle verifies that the source stamp
    still matches every project-built native output before creating the JAR.
 5. Run `scripts/verify-native-provenance.ps1 -JarPath <jar>` to compare either
@@ -114,10 +141,12 @@ The repository has two public verification workflows:
 - `native-reproducibility.yml` downloads both exact Modrinth JARs, verifies all
   nine DLL/SPIR-V entries in each, downloads and verifies the official
   Streamline archive, rebuilds all three 0.3.18 project-owned outputs from
-  hash-pinned Zig, LunarG/glslc and JDK inputs, and recreates both 0.3.16
-  shaders with hash-pinned LWJGL shaderc 3.4.1.
+  hash-pinned Zig, LunarG/glslc and JDK inputs, compares the bridge outside its
+  20 explicitly documented volatile metadata bytes, and recreates both
+  0.3.16 shaders with hash-pinned LWJGL shaderc 3.4.1.
 
 The 0.3.16 bridge source, source stamp, and published DLL remain fully
 hash-verified, but CI does not claim an exact bridge rebuild because that old
 release did not record archive-level identities for every Vulkan/JNI header.
 No downloaded or rebuilt NVIDIA binary is uploaded as a workflow artifact.
+
