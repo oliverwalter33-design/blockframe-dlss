@@ -1,0 +1,23 @@
+.gradle/
+build/
+out/
+logs/
+run/
+run-*/
+.idea/
+.vscode/
+*.iml
+
+# Keep generated and third-party binaries out of this source-only repository.
+*.class
+*.jar
+*.dll
+*.exe
+*.lib
+*.pdb
+*.spv
+*.bin
+*.log
+
+# Optional local evidence dependencies referenced by gradle.properties.
+local-libs/

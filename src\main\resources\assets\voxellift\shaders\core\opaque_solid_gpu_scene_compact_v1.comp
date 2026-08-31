@@ -1,0 +1,56 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) readonly buffer SceneBuffer {
+    uint scene[];
+};
+layout(std430, binding = 1) readonly buffer VisibleBuffer {
+    uint visible[];
+};
+layout(std430, binding = 2) writeonly buffer CommandBuffer {
+    uint commands[];
+};
+layout(std430, binding = 3) buffer CountBuffer {
+    uint counts[];
+};
+layout(std430, binding = 4) writeonly buffer VisibilityBuffer {
+    uint visibility[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint visibleCount;
+};
+
+const uint CAPACITY = 16384u;
+const uint SCENE_WORDS = 8u;
+const uint COMMAND_WORDS = 5u;
+
+void main() {
+    uint ordinal = gl_GlobalInvocationID.x;
+    if (ordinal >= visibleCount) {
+        return;
+    }
+    uint slot = visible[ordinal * 2u];
+    uint visibilityBits = visible[ordinal * 2u + 1u];
+    if (slot >= CAPACITY) {
+        return;
+    }
+    uint sceneBase = slot * SCENE_WORDS;
+    if (scene[sceneBase] != 1u) {
+        return;
+    }
+    uint bucket = scene[sceneBase + 1u];
+    uint destination = atomicAdd(counts[bucket], 1u);
+    if (destination >= CAPACITY) {
+        return;
+    }
+    uint commandBase =
+        (bucket * CAPACITY + destination) * COMMAND_WORDS;
+    commands[commandBase] = scene[sceneBase + 2u];
+    commands[commandBase + 1u] = 1u;
+    commands[commandBase + 2u] = scene[sceneBase + 3u];
+    commands[commandBase + 3u] = scene[sceneBase + 4u];
+    commands[commandBase + 4u] = slot;
+    visibility[slot] = visibilityBits;
+}

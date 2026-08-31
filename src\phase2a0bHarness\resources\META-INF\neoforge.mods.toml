@@ -1,0 +1,30 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT (development harness only)"
+displayTest="IGNORE_ALL_VERSION"
+
+[[mods]]
+modId="blockframe_2a0b_harness"
+version="1.0.0"
+displayName="BlockFrame Phase 2A.0B Dev Harness"
+description='''
+Explicit, non-published DTC fixture scout and replay harness.
+'''
+clientSideOnly=true
+
+[[mixins]]
+config="blockframe_phase2a0b.mixins.json"
+
+[[dependencies.blockframe_2a0b_harness]]
+modId="minecraft"
+type="required"
+versionRange="[26.2]"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.blockframe_2a0b_harness]]
+modId="voxellift"
+type="required"
+versionRange="[0,)"
+ordering="AFTER"
+side="CLIENT"

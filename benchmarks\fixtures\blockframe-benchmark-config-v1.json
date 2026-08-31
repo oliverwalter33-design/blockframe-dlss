@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "profileId": "BlockFrame_Benchmark_Config_v1",
+  "status": "IMMUTABLE_PROFILE_AND_EXACT_APPLY_RESTORE_VERIFIED_LIVE_REPLAY_FAILED",
+  "canonicalization": {
+    "algorithm": "SHA-256",
+    "header": "BLOCKFRAME_BENCHMARK_START_PROFILE_V1",
+    "fieldOrdering": "String.compareTo ordinal",
+    "lineFormat": "field=value",
+    "encoding": "UTF-8",
+    "separator": "LF",
+    "trailingSeparator": false
+  },
+  "benchmarkStartProfileHash": "3a78ec4a863e3e10c7bcf57179e57f2889953b0700681d49e6f2ece710e1f40d",
+  "fields": {
+    "runtime.minecraftVersion": "26.2",
+    "runtime.neoForgeVersion": "26.2.0.23-beta",
+    "runtime.javaVersion": "25.0.3",
+    "runtime.modListHash": "2c62dafa41b3ee9a66369af32ba549f1869dca3463baa4e872e466bd180a9209",
+    "runtime.graphicsBackend": "vulkan",
+    "display.width": "1920",
+    "display.height": "1080",
+    "display.windowMode": "WINDOWED",
+    "minecraft.options.enableVsync": "false",
+    "minecraft.options.maxFps": "260",
+    "minecraft.options.renderDistance": "12",
+    "minecraft.options.simulationDistance": "12",
+    "minecraft.options.fov": "0.0",
+    "minecraft.options.fullscreen": "false",
+    "minecraft.options.overrideWidth": "1920",
+    "minecraft.options.overrideHeight": "1080",
+    "minecraft.options.graphicsPreset": "custom",
+    "minecraft.options.particles": "0",
+    "minecraft.options.mipmapLevels": "4",
+    "minecraft.options.biomeBlendRadius": "2",
+    "minecraft.options.ao": "true",
+    "minecraft.options.entityDistanceScaling": "1.0",
+    "minecraft.options.renderClouds": "true",
+    "baseline.dlss": "false",
+    "baseline.dlaa": "false",
+    "baseline.frameGeneration": "false",
+    "baseline.dynamicResolution": "false",
+    "blockframe.config.voxellift.mode": "off",
+    "blockframe.config.voxellift.sharpening": "auto",
+    "blockframe.config.voxellift.sharpeningAmount": "20",
+    "blockframe.config.engineFilePresent": "false",
+    "renderer.gpuModel": "NVIDIA GeForce RTX 4090",
+    "renderer.driverVersion": "610.74",
+    "thirdParty.semanticConfig": "NOT_INSPECTED_FUNCTIONAL_SMOKE_ONLY"
+  },
+  "mixedFileProjection": {
+    "options.txt": [
+      "ao",
+      "biomeBlendRadius",
+      "enableVsync",
+      "entityDistanceScaling",
+      "fov",
+      "fullscreen",
+      "graphicsPreset",
+      "maxFps",
+      "mipmapLevels",
+      "overrideHeight",
+      "overrideWidth",
+      "particles",
+      "renderClouds",
+      "renderDistance",
+      "simulationDistance"
+    ],
+    "config/voxellift.properties": [
+      "mode",
+      "sharpening",
+      "sharpeningAmount"
+    ]
+  },
+  "volatileRuntimeState": [
+    "last opened world",
+    "window position",
+    "GUI state",
+    "session data",
+    "runtime caches",
+    "automatically rewritten timestamps",
+    "non-semantic values outside the versioned mixed-file projection"
+  ],
+  "historicalCaptureProvenance": {
+    "phase2a0aReported": {
+      "status": "UNRECOVERABLE_TRUNCATED_REPORT_ONLY",
+      "reportedPrefix": "8fc44097",
+      "reportedSuffix": "fbbfcf",
+      "fullHash": null,
+      "scopeManifest": null
+    },
+    "phase2a0bCaptureRaw87": {
+      "hash": "9e5b66d3b79c3b9ee4339be3020cf49d1d31c65c8bd2d1146b25842a55051608",
+      "scope": "config/**, defaultconfigs/** and present options/user-JVM files",
+      "status": "HISTORICAL_UNRECOVERABLE_RAW_STATE"
+    },
+    "phase2a0bPostScoutRaw87": {
+      "hash": "f2bb896483f55f580189c9248ec086c4e1c81fcdc20ddecfe0f414831dd69c38",
+      "scope": "config/**, defaultconfigs/** and present options/user-JVM files",
+      "status": "CURRENT_PRE_ASSIGNMENT_STATE"
+    }
+  },
+  "claims": {
+    "performanceBaseline": "NOT_RUN",
+    "fpsOrSpeedup": "NOT_CLAIMED",
+    "thirdPartyConfigSemanticCoverage": "NOT_AVAILABLE_BY_SCOPE",
+    "liveReplay": "FAILED_BEFORE_OWNER_NO_SCENES_OR_CPU_WINDOWS",
+    "phase2a1": "NOT_STARTED"
+  }
+}

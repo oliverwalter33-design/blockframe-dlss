@@ -1,0 +1,96 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) buffer NativeTerrainSceneBuffer {
+    uint scene[];
+};
+layout(std430, binding = 1) writeonly buffer NativeTerrainCommandBuffer {
+    uint commands[];
+};
+layout(std430, binding = 2) buffer NativeTerrainCountBuffer {
+    uint counts[];
+};
+
+layout(push_constant) uniform NativeTerrainFrame {
+    vec4 FrustumPlanes[6];
+    ivec4 CameraBlockAndCount;
+    vec4 CameraOffsetAndCapacity;
+};
+
+const uint FLAG_ACTIVE = 1u;
+const uint ENTRY_WORDS = 20u;
+const uint COMMAND_WORDS = 5u;
+
+bool outsidePlane(vec3 minimumPoint, vec3 maximumPoint, vec4 plane) {
+    vec3 positive = mix(
+        minimumPoint,
+        maximumPoint,
+        greaterThanEqual(plane.xyz, vec3(0.0))
+    );
+    // Plane W already contains the CPU-selected conservative epsilon.
+    return dot(plane.xyz, positive) + plane.w < 0.0;
+}
+
+void main() {
+    uint slot = gl_GlobalInvocationID.x;
+    uint sceneCount = uint(CameraBlockAndCount.w);
+    uint commandCapacity =
+        floatBitsToUint(CameraOffsetAndCapacity.w);
+    if (slot >= sceneCount) {
+        return;
+    }
+
+    uint base = slot * ENTRY_WORDS;
+    uint flags = scene[base];
+    if ((flags & FLAG_ACTIVE) == 0u) {
+        return;
+    }
+    vec3 section = vec3(
+        int(scene[base + 6u]) - CameraBlockAndCount.x,
+        int(scene[base + 7u]) - CameraBlockAndCount.y,
+        int(scene[base + 8u]) - CameraBlockAndCount.z
+    ) + CameraOffsetAndCapacity.xyz;
+    vec3 minimumPoint = section + vec3(
+        uintBitsToFloat(scene[base + 9u]),
+        uintBitsToFloat(scene[base + 10u]),
+        uintBitsToFloat(scene[base + 11u])
+    );
+    vec3 maximumPoint = section + vec3(
+        uintBitsToFloat(scene[base + 12u]),
+        uintBitsToFloat(scene[base + 13u]),
+        uintBitsToFloat(scene[base + 14u])
+    );
+
+    bool uncertain = (flags & 2u) != 0u;
+    if (!uncertain) {
+        for (int plane = 0; plane < 6; plane++) {
+            if (
+                outsidePlane(
+                    minimumPoint,
+                    maximumPoint,
+                    FrustumPlanes[plane]
+                )
+            ) {
+                return;
+            }
+        }
+    }
+    // A new entry is visible for one complete frame before culling it.
+    if (uncertain) {
+        atomicAnd(scene[base], ~2u);
+    }
+
+    uint bucket = scene[base + 1u];
+    uint destination = atomicAdd(counts[bucket], 1u);
+    if (destination >= commandCapacity) {
+        return;
+    }
+    uint command =
+        (bucket * commandCapacity + destination) * COMMAND_WORDS;
+    commands[command] = scene[base + 2u];
+    commands[command + 1u] = 1u;
+    commands[command + 2u] = scene[base + 3u];
+    commands[command + 3u] = scene[base + 4u];
+    commands[command + 4u] = slot;
+}

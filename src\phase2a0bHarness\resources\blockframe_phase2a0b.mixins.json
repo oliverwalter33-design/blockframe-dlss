@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.morau.blockframe.benchmark.phase2a0b.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "Phase2a0bGameRendererMixin",
+    "Phase2a0bMinecraftMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

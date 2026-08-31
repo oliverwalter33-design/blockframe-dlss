@@ -1,0 +1,983 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.141'
+}
+
+version = mod_version
+group = mod_group_id
+
+base { archivesName = mod_artifact_name }
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    maven {
+        name = 'CaffeineMC'
+        url = 'https://maven.caffeinemc.net/releases'
+    }
+}
+
+def foundationBVulkanSmoke = providers.systemProperty(
+    'blockframe.foundationBVulkanSmokeRun'
+).map { it.toBoolean() }.getOrElse(false)
+
+neoForge {
+    version = project.neo_version
+    runs {
+        client { client() }
+        vulkanClient {
+            client()
+            gameDirectory = project.file('run-vulkan')
+            programArguments.addAll '--graphicsBackend', 'vulkan'
+            [
+                'devSequenceFrames',
+                'devSequenceStartFrame',
+                'devSequenceRoi',
+                'devSequenceId',
+                'devForceThirdPerson',
+                'devSequenceMotion',
+                'devLocalPlayerMotion'
+            ].each { diagnosticProperty ->
+                providers.gradleProperty(diagnosticProperty).orNull?.with {
+                    systemProperty "nvidia_dlss.${diagnosticProperty}", it
+                }
+            }
+            if (providers.gradleProperty('devWidth').isPresent()) {
+                programArguments.addAll '--width', providers.gradleProperty('devWidth').get()
+            }
+            if (providers.gradleProperty('devHeight').isPresent()) {
+                programArguments.addAll '--height', providers.gradleProperty('devHeight').get()
+            }
+            if (!foundationBVulkanSmoke) {
+                programArguments.addAll '--quickPlaySingleplayer',
+                    providers.gradleProperty('devWorld').getOrElse('Neue Welt')
+            } else {
+                systemProperty(
+                    'blockframe.nativeTerrain.foundationBSmoke',
+                    'true'
+                )
+            }
+            systemProperty 'nvidia_dlss.selftest', 'true'
+        }
+        configureEach { logLevel = org.slf4j.event.Level.INFO }
+    }
+    mods {
+        "${mod_id}" { sourceSet(sourceSets.main) }
+    }
+}
+
+def prepareVulkanRunConfig = tasks.register('prepareVulkanRunConfig', Copy) {
+    group = 'blockframe'
+    description = 'Disables NeoForge early OpenGL window takeover for the dedicated Vulkan development run.'
+    from layout.projectDirectory.file('run-config/vulkan/fml.toml')
+    into layout.projectDirectory.dir('run-vulkan/config')
+}
+
+tasks.named('runVulkanClient').configure {
+    dependsOn prepareVulkanRunConfig
+}
+
+dependencies {
+    compileOnly "net.caffeinemc:sodium-neoforge-api:${sodium_version}"
+    // Exact, compile-time-only API evidence for the fail-closed Bricks 1.0.1
+    // compatibility path. The artifact boundary test forbids packaging it.
+    compileOnly files(project.bricks_compat_evidence_jar)
+    testImplementation files(project.bricks_compat_evidence_jar)
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.joml:joml:1.10.8'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+sourceSets {
+    test {
+        // Phase 1A.11 verifies Mojang's VulkanFeature/pNext contract against
+        // the same patched Minecraft and LWJGL classes used by production.
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+    phase1a8Benchmark {
+        java.srcDir 'src/benchmark/java'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
+    }
+    phase1a10Benchmark {
+        java.srcDir 'src/phase1a10Benchmark/java'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
+    }
+    phase1a12Benchmark {
+        java.srcDir 'src/phase1a12Benchmark/java'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
+    }
+    phase2a0bHarness {
+        java.srcDir 'src/phase2a0bHarness/java'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
+    }
+    phase2a0bTest {
+        java.srcDir 'src/phase2a0bTest/java'
+        compileClasspath += (
+            sourceSets.phase2a0bHarness.output
+            + sourceSets.phase2a0bHarness.compileClasspath
+            + sourceSets.test.compileClasspath
+        )
+        runtimeClasspath += (
+            output
+            + compileClasspath
+            + sourceSets.phase2a0bHarness.runtimeClasspath
+            + sourceSets.test.runtimeClasspath
+        )
+    }
+    phase2a0cCapture {
+        java.srcDir 'src/phase2a0cCapture/java'
+        // Consume only the patched Minecraft/NeoForge dependency graph. The
+        // standalone capture artifact must never see BlockFrame main output.
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+    phase2a0cTest {
+        java.srcDir 'src/phase2a0cTest/java'
+        compileClasspath += (
+            sourceSets.phase2a0cCapture.output
+            + sourceSets.phase2a0cCapture.compileClasspath
+            + configurations.testCompileClasspath
+        )
+        runtimeClasspath += (
+            output
+            + compileClasspath
+            + sourceSets.phase2a0cCapture.runtimeClasspath
+            + configurations.testRuntimeClasspath
+        )
+    }
+    phase2a1CaptureV2 {
+        java.srcDir 'src/phase2a1CaptureV2/java'
+        // V2 remains an isolated development capture artifact. It consumes
+        // Mojang/NeoForge/LWJGL only and never sees BlockFrame main output.
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+    phase2a1TestV2 {
+        java.srcDir 'src/phase2a1TestV2/java'
+        compileClasspath += (
+            sourceSets.phase2a1CaptureV2.output
+            + sourceSets.phase2a1CaptureV2.compileClasspath
+            + configurations.testCompileClasspath
+        )
+        runtimeClasspath += (
+            output
+            + compileClasspath
+            + sourceSets.phase2a1CaptureV2.runtimeClasspath
+            + configurations.testRuntimeClasspath
+        )
+    }
+    phase2a1CaptureV6 {
+        java.srcDir 'src/phase2a1CaptureV6/java'
+        // V6 is the isolated deterministic-workload audit capture. It sees
+        // Mojang/NeoForge/LWJGL only and never BlockFrame production output.
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+    phase2a1TestV6 {
+        java.srcDir 'src/phase2a1TestV6/java'
+        compileClasspath += (
+            sourceSets.phase2a1CaptureV6.output
+            + sourceSets.phase2a1CaptureV6.compileClasspath
+            + configurations.testCompileClasspath
+        )
+        runtimeClasspath += (
+            output
+            + compileClasspath
+            + sourceSets.phase2a1CaptureV6.runtimeClasspath
+            + configurations.testRuntimeClasspath
+        )
+    }
+    phase2a1CaptureV7 {
+        java.srcDir 'src/phase2a1CaptureV7/java'
+        // V7 is the isolated canonical-visible-workload audit capture. It
+        // consumes Mojang/NeoForge/LWJGL only and never BlockFrame output.
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+    phase2a1TestV7 {
+        java.srcDir 'src/phase2a1TestV7/java'
+        compileClasspath += (
+            sourceSets.phase2a1CaptureV7.output
+            + sourceSets.phase2a1CaptureV7.compileClasspath
+            + configurations.testCompileClasspath
+        )
+        runtimeClasspath += (
+            output
+            + compileClasspath
+            + sourceSets.phase2a1CaptureV7.runtimeClasspath
+            + configurations.testRuntimeClasspath
+        )
+    }
+}
+
+configurations {
+    phase2a0bTestImplementation.extendsFrom testImplementation
+    phase2a0bTestRuntimeOnly.extendsFrom testRuntimeOnly
+    phase2a0cTestImplementation.extendsFrom testImplementation
+    phase2a0cTestRuntimeOnly.extendsFrom testRuntimeOnly
+    phase2a1TestV2Implementation.extendsFrom testImplementation
+    phase2a1TestV2RuntimeOnly.extendsFrom testRuntimeOnly
+    phase2a1TestV6Implementation.extendsFrom testImplementation
+    phase2a1TestV6RuntimeOnly.extendsFrom testRuntimeOnly
+    phase2a1TestV7Implementation.extendsFrom testImplementation
+    phase2a1TestV7RuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    systemProperty 'blockframe.projectDir', project.projectDir.absolutePath
+    systemProperty(
+        'blockframe.bricksCompatEvidenceJar',
+        project.bricks_compat_evidence_jar
+    )
+    systemProperty(
+        'blockframe.minecraft26057PatchedEvidenceJar',
+        project.minecraft_26_2_0_57_patched_evidence_jar
+    )
+    def junitTempRoot = layout.buildDirectory.dir(
+        "tmp/junit/${name}"
+    )
+    systemProperty(
+        'java.io.tmpdir',
+        junitTempRoot.get().asFile.absolutePath
+    )
+    systemProperty(
+        'junit.jupiter.tempdir.cleanup.mode.default',
+        'NEVER'
+    )
+    doFirst {
+        def root = junitTempRoot.get().asFile
+        if (root.exists()) {
+            project.delete(root)
+        }
+        if (!root.mkdirs() && !root.isDirectory()) {
+            throw new GradleException(
+                "Could not create isolated JUnit temp root: ${root}"
+            )
+        }
+    }
+    doLast {
+        def root = junitTempRoot.get().asFile
+        for (int attempt = 0;
+            root.exists() && attempt < 10;
+            attempt++) {
+            try {
+                project.delete(root)
+            } catch (Exception ignored) {
+                // A Windows scanner may briefly retain a new test file.
+            }
+            if (root.exists()) {
+                Thread.sleep(50L)
+            }
+        }
+        if (root.exists()) {
+            throw new GradleException(
+                "Isolated JUnit temp root remained: ${root}"
+            )
+        }
+    }
+}
+
+tasks.named('test', Test) {
+    dependsOn tasks.named('jar')
+    inputs.file(tasks.named('jar', Jar).flatMap { it.archiveFile })
+        .withPropertyName('blockframeDistributableJar')
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    doFirst {
+        systemProperty(
+            'blockframe.distributableJar',
+            tasks.named('jar', Jar).get().archiveFile.get().asFile.absolutePath
+        )
+    }
+}
+
+def phase2a0bFixtureInputs = [
+    'benchmarks/fixtures/blockframe-benchmark-config-v1.json',
+    'benchmarks/fixtures/blockframe-2a0b-captured-runtime-v2.json',
+    'benchmarks/fixtures/blockframe-dtc-scenes-v1.json',
+    'benchmarks/fixtures/blockframe-dtc-scenes-v2.json'
+].collect { layout.projectDirectory.file(it) }
+
+tasks.register('phase2a0bTest', Test) {
+    group = 'verification'
+    description = 'Runs the isolated Phase 2A.0B fixture, replay, measurement and CPU snapshot contract tests.'
+    dependsOn tasks.named('jar')
+    testClassesDirs = sourceSets.phase2a0bTest.output.classesDirs
+    classpath = sourceSets.phase2a0bTest.runtimeClasspath
+    inputs.files(phase2a0bFixtureInputs)
+        .withPropertyName('phase2a0bFixtureInputs')
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(tasks.named('jar', Jar).flatMap { it.archiveFile })
+        .withPropertyName('phase2a0bProductionJar')
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+tasks.register('phase2a0bHarnessJar', Jar) {
+    group = 'blockframe benchmark'
+    description = 'Builds the dev-only Phase 2A.0B Minecraft scout/replay harness; never published.'
+    dependsOn tasks.named('phase2a0bHarnessClasses')
+    archiveClassifier = 'phase2a0b-harness-dev-only'
+    from sourceSets.phase2a0bHarness.output
+    manifest {
+        attributes(
+            'MixinConfigs': 'blockframe_phase2a0b.mixins.json',
+            'BlockFrame-Dev-Only': 'true'
+        )
+    }
+}
+
+tasks.register('phase2a0bFixtureRunner', JavaExec) {
+    group = 'blockframe benchmark'
+    description = 'Prepares or finalizes one physical Phase 2A.0B fixture run copy.'
+    dependsOn tasks.named('phase2a0bHarnessClasses')
+    classpath = sourceSets.phase2a0bHarness.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.benchmark.phase2a0b.FixtureRunManager'
+    doFirst {
+        def command = project.findProperty('phase2a0bCommand')
+        def instance = project.findProperty('phase2a0bInstance')
+        if (command == null || instance == null) {
+            throw new GradleException(
+                'phase2a0bFixtureRunner requires '
+                    + '-Pphase2a0bCommand=<create-config-profile|prepare-scout|prepare-replay|prepare-suite|verify-start-profile|finalize|finalize-suite|restore-config|raw-config-hash|audit|topology|offline-audit> '
+                    + 'and -Pphase2a0bInstance=<CurseForge instance>'
+            )
+        }
+        args command, instance, project.projectDir.absolutePath
+        if (project.hasProperty('phase2a0bRunId')) {
+            args project.property('phase2a0bRunId')
+        }
+        if (project.hasProperty('phase2a0bSceneId')) {
+            args project.property('phase2a0bSceneId')
+        }
+    }
+}
+
+tasks.register('verifyPhase2a0bProductionJar') {
+    group = 'verification'
+    description = 'Proves Phase 2A.0B harness and CPU sampler classes are absent from the production JAR.'
+    dependsOn tasks.named('jar')
+    doLast {
+        def forbiddenPrefix =
+            'de/morau/blockframe/benchmark/phase2a0b/'
+        def leaked = zipTree(tasks.named('jar').get().archiveFile.get().asFile)
+            .matching { include "${forbiddenPrefix}**" }
+            .files
+        if (!leaked.isEmpty()) {
+            throw new GradleException(
+                "Phase 2A.0B dev classes leaked into production JAR: ${leaked}"
+            )
+        }
+    }
+}
+
+tasks.register('phase2a0cTest', Test) {
+    group = 'verification'
+    description = 'Runs only the standalone Phase 2A.0C single-process capture contract tests.'
+    testClassesDirs = sourceSets.phase2a0cTest.output.classesDirs
+    classpath = sourceSets.phase2a0cTest.runtimeClasspath
+}
+
+tasks.register('phase2a0cCaptureJar', Jar) {
+    group = 'blockframe benchmark'
+    description = 'Builds the standalone dev-only Phase 2A.0C capture mod; never published.'
+    dependsOn tasks.named('phase2a0cCaptureClasses')
+    archiveBaseName = 'blockframe-phase2a0c-capture'
+    archiveVersion = '1.0.0'
+    archiveClassifier = 'phase2a0c-capture-dev-only'
+    from sourceSets.phase2a0cCapture.output
+    manifest {
+        attributes(
+            'MixinConfigs': 'blockframe_phase2a0c.mixins.json',
+            'BlockFrame-Dev-Only': 'true',
+            'BlockFrame-Production-Dependency': 'none'
+        )
+    }
+}
+
+tasks.register('phase2a1TestV2', Test) {
+    group = 'verification'
+    description = 'Runs the versioned Phase 2A.1 GLFW/Win32 window identity contract tests.'
+    testClassesDirs = sourceSets.phase2a1TestV2.output.classesDirs
+    classpath = sourceSets.phase2a1TestV2.runtimeClasspath
+}
+
+tasks.register('phase2a1CaptureV2Jar', Jar) {
+    group = 'blockframe benchmark'
+    description = 'Builds the isolated Phase 2A.1 V2 HWND-aware development capture mod.'
+    dependsOn tasks.named('phase2a1CaptureV2Classes')
+    archiveBaseName = 'blockframe-phase2a1-capture'
+    archiveVersion = '2.0.0'
+    archiveClassifier = 'phase2a1-capture-v2-dev-only'
+    from sourceSets.phase2a1CaptureV2.output
+    manifest {
+        attributes(
+            'MixinConfigs': 'blockframe_phase2a0c.mixins.json',
+            'BlockFrame-Dev-Only': 'true',
+            'BlockFrame-Production-Dependency': 'none',
+            'BlockFrame-Present-Contract': 'greenfield-vulkan-present-correlation-v2'
+        )
+    }
+}
+
+tasks.register('phase2a1TestV6', Test) {
+    group = 'verification'
+    description = 'Runs the isolated deterministic workload and residual draw audit capture tests.'
+    testClassesDirs = sourceSets.phase2a1TestV6.output.classesDirs
+    classpath = sourceSets.phase2a1TestV6.runtimeClasspath
+}
+
+tasks.register('phase2a1CaptureV6Jar', Jar) {
+    group = 'blockframe benchmark'
+    description = 'Builds the isolated Phase 2A.1C deterministic workload audit capture mod.'
+    dependsOn tasks.named('phase2a1CaptureV6Classes')
+    archiveBaseName = 'blockframe-phase2a1-capture'
+    archiveVersion = '6.0.0'
+    archiveClassifier = 'phase2a1-capture-v6-dev-only'
+    from sourceSets.phase2a1CaptureV6.output
+    manifest {
+        attributes(
+            'MixinConfigs': 'blockframe_phase2a0c.mixins.json',
+            'BlockFrame-Dev-Only': 'true',
+            'BlockFrame-Production-Dependency': 'none',
+            'BlockFrame-Present-Contract': 'greenfield-vulkan-present-correlation-v15'
+        )
+    }
+}
+
+tasks.register('phase2a1TestV7', Test) {
+    group = 'verification'
+    description = 'Runs the isolated canonical visible workload and corrected draw taxonomy tests.'
+    testClassesDirs = sourceSets.phase2a1TestV7.output.classesDirs
+    classpath = sourceSets.phase2a1TestV7.runtimeClasspath
+}
+
+tasks.register('phase2a1CaptureV7Jar', Jar) {
+    group = 'blockframe benchmark'
+    description = 'Builds the isolated Phase 2A.1D canonical visible workload audit capture mod.'
+    dependsOn tasks.named('phase2a1CaptureV7Classes')
+    archiveBaseName = 'blockframe-phase2a1-capture'
+    archiveVersion = '7.0.0'
+    archiveClassifier = 'phase2a1-capture-v7-dev-only'
+    from sourceSets.phase2a1CaptureV7.output
+    manifest {
+        attributes(
+            'MixinConfigs': 'blockframe_phase2a0c.mixins.json',
+            'BlockFrame-Dev-Only': 'true',
+            'BlockFrame-Production-Dependency': 'none',
+            'BlockFrame-Present-Contract': 'greenfield-vulkan-present-correlation-v16'
+        )
+    }
+}
+
+tasks.register('phase2a0cOfflinePreflight', Exec) {
+    group = 'verification'
+    description = 'Runs focused tests, builds the one dev artifact, and writes the 2A.0C smoke preflight.'
+    dependsOn tasks.named('phase2a0cTest')
+    dependsOn tasks.named('phase2a0cCaptureJar')
+    workingDir project.projectDir
+    commandLine(
+        'powershell',
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        layout.projectDirectory.file('scripts/phase2a0c-run-one.ps1').asFile.absolutePath,
+        '-Action',
+        'OfflinePreflight'
+    )
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('phase2a0bTest')
+    dependsOn tasks.named('verifyPhase2a0bProductionJar')
+}
+
+tasks.register('benchmarkNativeCache', JavaExec) {
+    group = 'verification'
+    description = 'Runs five cold and five warm materializations of the exact packaged native bundle.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.cache.NativeArtifactCacheBenchmark'
+    args layout.projectDirectory.file(
+        'benchmarks/phase2-native-cache.csv'
+    ).asFile.absolutePath
+}
+
+tasks.register('benchmarkMemoryBudgets', JavaExec) {
+    group = 'verification'
+    description = 'Measures one million no-eviction steady-state BlockFrame memory lease cycles.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.core.budget.MemoryBudgetBenchmark'
+    args layout.projectDirectory.file(
+        'benchmarks/phase1a-memory.csv'
+    ).asFile.absolutePath
+}
+
+tasks.register('benchmarkMotionScratch', JavaExec) {
+    group = 'verification'
+    description = 'Measures the isolated fixed motion-object transport batch and its legacy list reference.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.nvidiadlss.MotionScratchBenchmark'
+    args layout.projectDirectory.file(
+        'benchmarks/phase1a-motion-scratch.csv'
+    ).asFile.absolutePath
+}
+
+tasks.register('benchmarkPhase1a3Scratch', JavaExec) {
+    group = 'verification'
+    description = 'Measures isolated Phase 1A.3 transform and native scratch reuse against its labelled legacy reference.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.nvidiadlss.Phase1a3ScratchBenchmark'
+    args layout.projectDirectory.file(
+        'benchmarks/phase1a3-scratch.csv'
+    ).asFile.absolutePath
+}
+
+tasks.register('benchmarkPhase1a4GpuBreadcrumbs', JavaExec) {
+    group = 'verification'
+    description = 'Measures the isolated Phase 1A.4 fixed native GPU-submission breadcrumb ring against a primitive checksum control.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.core.diagnostics.Phase1a4GpuBreadcrumbsBenchmark'
+    args layout.projectDirectory.file(
+        'benchmarks/phase1a4-gpu-breadcrumbs.csv'
+    ).asFile.absolutePath
+}
+
+tasks.register('benchmarkPhase1a5NativeEntityHistory', JavaExec) {
+    group = 'verification'
+    description = 'Runs the fork-isolated Phase 1A.5 heap/native entity-history matrix.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.nvidiadlss.Phase1a5ForkedEntityHistoryBenchmark'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    def outputPath = project.findProperty('phase1a5Output')
+        ?: 'benchmarks/phase1a5-native-entity-history.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('phase1a5Forks')) {
+        args project.property('phase1a5Forks')
+    }
+}
+
+tasks.register('benchmarkPhase1a6EvictableStaging', JavaExec) {
+    group = 'verification'
+    description = 'Runs fork-isolated Phase 1A.6 shader-staging Evictable/LRU measurements.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.core.memory.Phase1a6EvictableStagingBenchmark'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    def outputPath = project.findProperty('phase1a6Output')
+        ?: 'benchmarks/phase1a6-evictable-staging.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('phase1a6Forks')) {
+        args project.property('phase1a6Forks')
+    }
+}
+
+tasks.register('benchmarkPhase1a7MaterialSamplers', JavaExec) {
+    group = 'verification'
+    description = 'Runs fork-isolated Phase 1A.7 fixed material-sampler lookup measurements against the previous map/record path.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.nvidiadlss.Phase1a7MaterialSamplerBenchmark'
+    systemProperty 'blockframe.projectDir', project.projectDir.absolutePath
+    def outputPath = project.findProperty('phase1a7Output')
+        ?: 'benchmarks/phase1a7-material-samplers.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('phase1a7Forks')) {
+        args project.property('phase1a7Forks')
+    }
+}
+
+tasks.register('benchmarkPhase1a8BlockOutlinePoseStack', JavaExec) {
+    group = 'verification'
+    description = 'Runs the fork-isolated Phase 1A.8 warmed block-outline PoseStack comparison against a fresh stack per operation.'
+    dependsOn tasks.named('phase1a8BenchmarkClasses')
+    classpath = sourceSets.phase1a8Benchmark.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.nvidiadlss.Phase1a8BlockOutlinePoseStackBenchmark'
+    systemProperty 'blockframe.projectDir', project.projectDir.absolutePath
+    def outputPath = project.findProperty('phase1a8Output')
+        ?: 'benchmarks/phase1a8-block-outline-pose-stack.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('phase1a8Forks')) {
+        args project.property('phase1a8Forks')
+    }
+}
+
+tasks.register('benchmarkPhase1a9PhysicalMemoryTelemetry', JavaExec) {
+    group = 'verification'
+    description = 'Runs fork-isolated Phase 1A.9 cached, OS-RAM and driver-free fixed device-memory telemetry measurements.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.vulkan.Phase1a9PhysicalMemoryTelemetryBenchmark'
+    systemProperty 'blockframe.projectDir', project.projectDir.absolutePath
+    def outputPath = project.findProperty('phase1a9Output')
+        ?: 'benchmarks/phase1a9-physical-memory-telemetry.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('phase1a9Forks')) {
+        args project.property('phase1a9Forks')
+    }
+}
+
+tasks.register('benchmarkPhase1a10GpuDiagnostics', JavaExec) {
+    group = 'verification'
+    description = 'Runs fork-isolated Phase 1A.10 disabled Debug Utils and null Tracy GPU diagnostic no-op measurements.'
+    dependsOn tasks.named('phase1a10BenchmarkClasses')
+    classpath = sourceSets.phase1a10Benchmark.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.core.diagnostics.Phase1a10GpuDiagnosticsBenchmark'
+    systemProperty 'blockframe.projectDir', project.projectDir.absolutePath
+    def outputPath = project.findProperty('phase1a10Output')
+        ?: 'benchmarks/phase1a10-gpu-diagnostics.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('phase1a10Forks')) {
+        args project.property('phase1a10Forks')
+    }
+}
+
+tasks.register('benchmarkPhase1a12RuntimeState', JavaExec) {
+    group = 'verification'
+    description = 'Runs fork-isolated Phase 1A.12 warmed cached runtime-state hotpath measurements without persistence I/O.'
+    dependsOn tasks.named('phase1a12BenchmarkClasses')
+    classpath = sourceSets.phase1a12Benchmark.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.core.state.Phase1a12RuntimeStateBenchmark'
+    systemProperty 'blockframe.projectDir', project.projectDir.absolutePath
+    def outputPath = project.findProperty('phase1a12Output')
+        ?: 'benchmarks/phase1a12-runtime-state.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('phase1a12Forks')) {
+        args project.property('phase1a12Forks')
+    }
+}
+
+tasks.register('benchmarkRendererCCompilerScaling', JavaExec) {
+    group = 'verification'
+    description = 'Runs fork-isolated 1/2/4/6-worker Renderer C V2 payload-encoder scaling without a Minecraft FPS claim.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    mainClass = 'de.morau.blockframe.render.terrain.nativeengine.RendererCCompilerScalingBenchmark'
+    def outputPath = project.findProperty('rendererCScalingOutput')
+        ?: 'benchmarks/renderer-c-compiler-scaling.csv'
+    args layout.projectDirectory.file(outputPath).asFile.absolutePath
+    if (project.hasProperty('rendererCScalingForks')) {
+        args project.property('rendererCScalingForks')
+    }
+}
+
+def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    def props = [
+        minecraft_version: minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        neo_version: neo_version,
+        mod_id: mod_id,
+        mod_name: mod_name,
+        mod_license: mod_license,
+        mod_version: mod_version
+    ]
+    inputs.properties props
+    expand props
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xmaxerrs', '1000'])
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    exclude '**/*.lib', '**/*.pdb'
+}
+
+def nativeRuntimeDir = layout.projectDirectory.dir('src/main/resources/assets/nvidia_dlss/native/win-x64')
+def nativeExtractFiles = [
+    'NvLowLatencyVk.dll',
+    'nvidia_dlss_bridge.dll',
+    'nis.license.txt',
+    'nvngx_dlss.dll',
+    'nvngx_dlss.license.txt',
+    'reflex.license.txt',
+    'sl.common.dll',
+    'sl.dlss.dll',
+    'sl.interposer.dll',
+    'sl.nis.dll'
+]
+def nativeRuntimeFiles = nativeExtractFiles + [
+    'motion_vectors.comp.spv',
+    'motion_vectors.debug.comp.spv'
+]
+def nativeSourceStamp = nativeRuntimeDir.file('native-source-v1.properties')
+def nativeBridgeSource = layout.projectDirectory.file('native/nvidia_dlss_bridge.cpp')
+def nativeMotionShaderSource = layout.projectDirectory.file('native/shaders/motion_vectors.comp')
+def generatedNativeManifestDir = layout.buildDirectory.dir(
+    'generated/resources/nativeRuntimeManifest'
+)
+
+def generateNativeRuntimeManifest = tasks.register('generateNativeRuntimeManifest') {
+    group = 'build'
+    description = 'Generates strict canonical manifest/key resources for immutable native artifacts.'
+    inputs.files(nativeExtractFiles.collect { nativeRuntimeDir.file(it) })
+    inputs.properties(
+        minecraftVersion: minecraft_version,
+        neoForgeVersion: neo_version,
+        blockframeVersion: mod_version
+    )
+    outputs.files(
+        generatedNativeManifestDir.map {
+            [
+                it.file('META-INF/blockframe/native-runtime-v1.manifest'),
+                it.file('META-INF/blockframe/native-runtime-v1.key')
+            ]
+        }
+    )
+
+    doLast {
+        def missing = nativeExtractFiles.findAll {
+            !nativeRuntimeDir.file(it).asFile.isFile()
+        }
+        if (!missing.isEmpty()) {
+            throw new GradleException(
+                "Missing immutable native artifacts: ${missing.join(', ')}"
+            )
+        }
+
+        def sha256 = { File file ->
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            file.withInputStream { input ->
+                byte[] buffer = new byte[64 * 1024]
+                int read
+                while ((read = input.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            java.util.HexFormat.of().formatHex(digest.digest())
+        }
+        def fileLines = nativeExtractFiles
+            .sort()
+            .collect { name ->
+                def file = nativeRuntimeDir.file(name).asFile
+                "file=${name}\t${file.length()}\t${sha256(file)}\n"
+            }
+        def bundleDigest = java.security.MessageDigest.getInstance('SHA-256')
+        fileLines.each {
+            bundleDigest.update(it.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        }
+        def bundleSha256 = java.util.HexFormat.of().formatHex(
+            bundleDigest.digest()
+        )
+        def manifest =
+            'BLOCKFRAME_IMMUTABLE_ARTIFACTS_V1\n' +
+            'schema=1\n' +
+            'artifact=native-runtime\n' +
+            "count=${fileLines.size()}\n" +
+            fileLines.join('') +
+            'bundle=' +
+            bundleSha256 +
+            '\n'
+        def dimensions = [
+            'artifact-bundle-sha256': bundleSha256,
+            'backend': 'vulkan',
+            'blockframe-version': mod_version.toString(),
+            'driver-version': 'not-a-dependency-runtime-validated',
+            'gpu-device-id': 'not-a-dependency-runtime-validated',
+            'gpu-vendor': 'not-a-dependency-runtime-validated',
+            'minecraft-api-target': minecraft_version.toString(),
+            'minecraft-runtime-version': 'not-a-dependency-of-packaged-native-bundle',
+            'mod-list': 'not-a-dependency-of-packaged-native-bundle',
+            'neoforge-api-target': neo_version.toString(),
+            'neoforge-runtime-version': 'not-a-dependency-of-packaged-native-bundle',
+            'registry-state': 'not-a-dependency-of-packaged-native-bundle',
+            'resourcepacks': 'not-a-dependency-of-packaged-native-bundle',
+            'shaderpack': 'not-a-dependency-of-packaged-native-bundle',
+            'vulkan-features': 'not-a-dependency-runtime-negotiated',
+            'vulkan-version': 'not-a-dependency-runtime-negotiated',
+            'windows-architecture': 'x86_64'
+        ]
+        def dimensionLines = dimensions
+            .sort { left, right -> left.key <=> right.key }
+            .collect { name, value -> "dimension=${name}\t${value}\n" }
+        def key =
+            'BLOCKFRAME_CACHE_KEY_V1\n' +
+            'schema=1\n' +
+            'kind=native-runtime/windows-x86_64\n' +
+            "count=${dimensionLines.size()}\n" +
+            dimensionLines.join('')
+        def generatedRoot = generatedNativeManifestDir.get()
+        def manifestTarget = generatedRoot
+            .file('META-INF/blockframe/native-runtime-v1.manifest')
+            .asFile
+        def keyTarget = generatedRoot
+            .file('META-INF/blockframe/native-runtime-v1.key')
+            .asFile
+        manifestTarget.parentFile.mkdirs()
+        manifestTarget.setText(manifest, 'UTF-8')
+        keyTarget.setText(key, 'UTF-8')
+    }
+}
+
+sourceSets.main.resources.srcDir generatedNativeManifestDir
+neoForge.ideSyncTask generateNativeRuntimeManifest
+
+tasks.named('processResources', ProcessResources).configure {
+    dependsOn generateNativeRuntimeManifest
+}
+
+tasks.register('verifyNativeRuntime') {
+    group = 'verification'
+    description = 'Checks that all native files required by a distributable JAR are staged.'
+    dependsOn generateNativeRuntimeManifest
+    inputs.files(nativeRuntimeFiles.collect { nativeRuntimeDir.file(it) })
+    inputs.files(nativeSourceStamp, nativeBridgeSource, nativeMotionShaderSource)
+
+    doLast {
+        def missing = nativeRuntimeFiles.findAll { !nativeRuntimeDir.file(it).asFile.isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException(
+                "Missing native runtime files: ${missing.join(', ')}. " +
+                'See README.md and run scripts/stage-nvidia-runtime.ps1 plus native/build-native.ps1.'
+            )
+        }
+
+        if (!nativeSourceStamp.asFile.isFile()) {
+            throw new GradleException(
+                'Missing native source provenance stamp. Run native/build-native.ps1 before packaging.'
+            )
+        }
+        def sha256 = { File file ->
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            file.withInputStream { input ->
+                byte[] buffer = new byte[64 * 1024]
+                int read
+                while ((read = input.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            java.util.HexFormat.of().formatHex(digest.digest())
+        }
+        def stamp = new Properties()
+        nativeSourceStamp.asFile.withInputStream { stamp.load(it) }
+        def expected = [
+            bridgeSourceSha256: sha256(nativeBridgeSource.asFile),
+            motionShaderSourceSha256: sha256(nativeMotionShaderSource.asFile),
+            bridgeBinarySha256: sha256(nativeRuntimeDir.file('nvidia_dlss_bridge.dll').asFile),
+            motionShaderBinarySha256: sha256(nativeRuntimeDir.file('motion_vectors.comp.spv').asFile),
+            motionShaderDiagnosticBinarySha256: sha256(nativeRuntimeDir.file('motion_vectors.debug.comp.spv').asFile),
+            motionShaderReleaseDefine: 'BLOCKFRAME_DEVELOPER_DIAGNOSTICS=0',
+            motionShaderDiagnosticDefine: 'BLOCKFRAME_DEVELOPER_DIAGNOSTICS=1'
+        ]
+        def mismatches = expected.findAll { name, value ->
+            !value.equalsIgnoreCase(stamp.getProperty(name, ''))
+        }
+        def missingMetadata = [
+            'bridgeCompiler',
+            'motionShaderCompiler'
+        ].findAll { stamp.getProperty(it, '').isBlank() }
+        if (
+            stamp.getProperty('schema') != '1'
+                || !mismatches.isEmpty()
+                || !missingMetadata.isEmpty()
+        ) {
+            throw new GradleException(
+                'Native source/binary provenance is stale for: ' +
+                (mismatches.keySet() + missingMetadata).join(', ') +
+                '. Run native/build-native.ps1 before packaging.'
+            )
+        }
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    dependsOn tasks.named('verifyNativeRuntime')
+    manifest { attributes 'MixinConfigs': 'nvidia_dlss.mixins.json' }
+}
+
+tasks.register('sourceZip', Zip) {
+    group = 'build'
+    description = 'Assembles the redistributable source archive with deterministic metadata and ordering.'
+    archiveClassifier = 'sources'
+    archiveExtension = 'zip'
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+
+    from(layout.projectDirectory) {
+        include 'build.gradle'
+        include 'CHANGELOG.md'
+        include 'CHANGELOG-DE.md'
+        include 'CHANGELOG-EN.md'
+        include 'gradle/**'
+        include 'gradle.properties'
+        include 'gradlew'
+        include 'gradlew.bat'
+        include 'LICENSE'
+        include 'NATIVE_TERRAIN_ARCHITECTURE.md'
+        include 'native/**'
+        include 'README.md'
+        include 'RELEASE-VERIFICATION-DE.md'
+        include 'settings.gradle'
+        include 'src/**'
+        include 'benchmarks/fixtures/blockframe-benchmark-config-v1.json'
+        include 'benchmarks/fixtures/blockframe-2a0b-captured-runtime-v2.json'
+        include 'benchmarks/fixtures/blockframe-dtc-scenes-v1.json'
+        include 'benchmarks/fixtures/blockframe-dtc-scenes-v2.json'
+
+        // Keep the source bundle source-only and preserve the previous archive scope.
+        exclude '**/*.dll'
+        exclude '**/*.jar'
+        exclude '**/*.lib'
+        exclude '**/*.pdb'
+        exclude '**/*.spv'
+    }
+}

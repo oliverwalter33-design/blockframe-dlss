@@ -1,0 +1,11 @@
+NVIDIA DLSS / DLAA for Minecraft 26.2
+
+This mod bundles unmodified redistributable binaries from NVIDIA Streamline SDK
+2.12.0, NVIDIA DLSS 310.7.0 and the Vulkan low-latency runtime required by the
+official Streamline distribution. Those NVIDIA components remain subject to
+NVIDIA's licenses included next to this notice and in the native resource
+directory. They are not licensed under the MIT license for the mod code and may
+not be extracted or redistributed as stand-alone products.
+
+The mod's Java/JNI integration code is independent experimental software and is
+not endorsed by NVIDIA or Mojang.

@@ -1,0 +1,23 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT (development capture only)"
+displayTest="IGNORE_ALL_VERSION"
+
+[[mods]]
+modId="blockframe_2a0c_capture"
+version="4.0.0"
+displayName="BlockFrame Phase 2A.1 Workload Identity V4 Dev Capture"
+description='''
+Standalone HWND- and workload-aware one-process, one-scene development recorder.
+'''
+clientSideOnly=true
+
+[[mixins]]
+config="blockframe_phase2a0c.mixins.json"
+
+[[dependencies.blockframe_2a0c_capture]]
+modId="minecraft"
+type="required"
+versionRange="[26.2]"
+ordering="NONE"
+side="CLIENT"

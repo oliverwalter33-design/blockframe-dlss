@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 2,
+  "phase": "2A.0B",
+  "status": "CAPTURED_RUNTIME_WITH_TYPED_SCENE_CONTRACT",
+  "capturedRuntime": {
+    "runtimeProfile": "CAPTURED_SECOND_LIVE_RUN_20260728",
+    "blockframeModId": "voxellift",
+    "blockframeReleaseVersion": "0.3.14",
+    "blockframeMetadataVersion": "0.3.14-neoforge-26.2",
+    "blockframeCodeSourceFilename": "blockframe-dlss-0.3.14-neoforge-26.2.jar",
+    "blockframeCodeSourceSha256": "7e9b6b7130f5d6bce3c0c158897a4eeb5f2aa3f9d08c2d908b56112a70d463a5",
+    "neoForgeVersion": "26.2.0.23-beta",
+    "minecraftVersion": "26.2",
+    "harnessVersion": "1.0.0",
+    "modProfileHash": "5eaadfbd0f322e0645d6f9cb0cf5c1b4794f3b2a6b637953ace8bcac9cea78ad",
+    "benchmarkStartProfileHash": "3a78ec4a863e3e10c7bcf57179e57f2889953b0700681d49e6f2ece710e1f40d",
+    "fixtureHash": "8218b992c5af65f2c86286e491e2f218f6d9bf4e00990566dfa53fc82ab39a10",
+    "sceneManifestHash": "a3d3efbe90c8138bd38d340aacd8397db3991469545c176ac9b0936bd83b0a2a",
+    "backend": "Vulkan",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "driver": "1.4.341 NVIDIA 610.74",
+    "cpuTopology": {
+      "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+      "physicalCores": 8,
+      "logicalProcessors": 16,
+      "jvmAvailableProcessors": 16,
+      "processAffinityMask": "65535",
+      "affinityLogicalProcessors": 16
+    }
+  },
+  "currentArtifactContract": {
+    "benchmarkStartProfileHash": "3a78ec4a863e3e10c7bcf57179e57f2889953b0700681d49e6f2ece710e1f40d",
+    "sceneManifestHash": "b401331b195587da414c694fc549de22750b6411460fa634df7ee00b263c8f0f",
+    "sceneManifest": "benchmarks/fixtures/blockframe-dtc-scenes-v2.json",
+    "modProfileHash": "5eaadfbd0f322e0645d6f9cb0cf5c1b4794f3b2a6b637953ace8bcac9cea78ad",
+    "sceneIds": [
+      "DTC_DENSE_STATIC",
+      "DTC_POI_SWEEP",
+      "DTC_CHUNK_TRAVERSE",
+      "DTC_IMAGE_REFERENCE"
+    ],
+    "sceneTypes": [
+      "PERFORMANCE",
+      "PERFORMANCE",
+      "PERFORMANCE",
+      "IMAGE_REFERENCE"
+    ],
+    "resultSchemaVersion": 2
+  },
+  "syntheticConfigReceipt": {
+    "transactionId": "offline-captured-runtime-regression-v2",
+    "appliedRawFileHash": "73f69b073351a236efdc9389adf3e1b40752703af409cc3b5912257a3c879fde",
+    "backupHash": "f2bb896483f55f580189c9248ec086c4e1c81fcdc20ddecfe0f414831dd69c38",
+    "appliedAtUtc": "2026-07-28T03:00:00Z",
+    "status": "APPLIED_VERIFIED",
+    "owner": "EXTERNAL_LAUNCHER"
+  },
+  "claims": {
+    "performanceBaseline": "NOT_RUN",
+    "fpsOrSpeedup": "NOT_CLAIMED",
+    "imageParity": "NOT_CLAIMED",
+    "phase2a1": "NOT_STARTED"
+  }
+}

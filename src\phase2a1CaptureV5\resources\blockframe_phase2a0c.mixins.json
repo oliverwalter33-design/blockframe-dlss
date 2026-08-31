@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.morau.blockframe.benchmark.phase2a0c.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "Phase2a0cCameraInvoker",
+    "Phase2a0cGameRendererMixin",
+    "Phase2a0cVulkanGpuSurfaceMixin",
+    "Phase2a1ChunkSectionsToRenderMixin",
+    "Phase2a1LevelRendererAccessor",
+    "Phase2a1SectionRenderDispatcherMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

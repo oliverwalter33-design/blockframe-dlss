@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "priority": 500,
+  "minVersion": "0.8",
+  "package": "de.morau.blockframe.benchmark.phase2a0c.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "Phase2a0cCameraInvoker",
+    "Phase2a0cGameRendererMixin",
+    "Phase2a0cVulkanGpuSurfaceMixin",
+    "Phase2a1CanonicalVisibleWorkloadMixin",
+    "Phase2a1ChunkSectionsToRenderMixin",
+    "Phase2a1LevelRendererAccessor",
+    "Phase2a1ParticleSuppressionMixin",
+    "Phase2a1SectionRenderDispatcherMixin",
+    "Phase2a1SectionRenderDispatcherBuffersAccessor",
+    "Phase2a1SectionUberBuffersAccessor",
+    "Phase2a1StaticWorldEventMixin$ResourceReload",
+    "Phase2a1StaticWorldEventMixin$WorldSave",
+    "Phase2a1UberGpuBufferBacklogMixin",
+    "Phase2a1VulkanRenderPassAuditMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
