@@ -39,11 +39,16 @@ The controls are available under **Options -> Video Settings -> DLSS**. The comp
 
 ## Building the source
 
-Run source checks with Java 25:
+Run source checks with Java 25 and Gradle 9.2.1:
 
 ```powershell
-.\gradlew.bat clean test
+gradle clean test
 ```
+
+This source-only publication intentionally omits the binary
+`gradle-wrapper.jar`. The required Gradle version remains pinned in
+`gradle/wrapper/gradle-wrapper.properties`; use an installed Gradle 9.2.1 or
+regenerate the standard wrapper locally with that version.
 
 The build has no Sodium compile dependency and does not bundle Sodium source.
 When Sodium 0.9.1 is present, an optional `@Pseudo` compatibility mixin marks
@@ -63,7 +68,7 @@ Native SDK binaries are deliberately not tracked in Git. To create a working rel
 ```powershell
 .\scripts\stage-nvidia-runtime.ps1 -StreamlineBin 'C:\path\to\streamline\bin\x64'
 .\native\build-native.ps1
-.\gradlew.bat clean test build
+gradle clean test build
 .\scripts\verify-native-provenance.ps1 -JarPath '.\build\libs\blockframe-dlss-0.3.18-neoforge-26.2.jar'
 ```
 
@@ -99,7 +104,7 @@ registry, loot, block-entity, model, shader or pipeline state. See
 The native-only five-cold-entry/five-warm-entry microbenchmark is:
 
 ```powershell
-.\gradlew.bat benchmarkNativeCache --no-daemon --rerun-tasks
+gradle benchmarkNativeCache --no-daemon --rerun-tasks
 ```
 
 ## Optional feature switches and Safe Start
