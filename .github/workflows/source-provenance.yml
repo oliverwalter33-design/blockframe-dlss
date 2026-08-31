@@ -1,0 +1,20 @@
+name: Source provenance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-source-provenance:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Verify native source hashes
+        shell: pwsh
+        run: ./scripts/verify-native-provenance.ps1
+
