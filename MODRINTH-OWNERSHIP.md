@@ -28,6 +28,11 @@ The exact source-publication commit before this verification file was added is:
 
 The complete source/binary map requested for technical review is in
 [`MODRINTH-BINARY-PROVENANCE.md`](MODRINTH-BINARY-PROVENANCE.md).
+It covers both Modrinth versions currently present: the current 0.3.18 source
+and the exact older 0.3.16 source tree published on the
+[`release/0.3.16-neoforge-26.2`](https://github.com/oliverwalter33-design/blockframe-dlss/tree/release/0.3.16-neoforge-26.2)
+branch. The version-specific native snapshot is also retained on `main` for
+automated cross-version verification.
 
 ## Statement for Modrinth moderation
 
@@ -38,4 +43,3 @@ Control of the already existing CurseForge project should be demonstrated separa
 For a direct cross-link, set the Modrinth project's **Settings → Links → Source code** field to:
 
 `https://github.com/oliverwalter33-design/blockframe-dlss`
-

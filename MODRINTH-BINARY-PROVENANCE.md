@@ -1,23 +1,23 @@
 # Native binary provenance for Modrinth review
 
-This document maps every native binary in the submitted **BlockFrame DLSS
-0.3.18** review candidate to either checked-in source or an exact official
+This document maps every native binary in both **BlockFrame DLSS** versions
+currently present on Modrinth to either checked-in source or an exact official
 NVIDIA SDK release. Generated and third-party binaries are deliberately not
 committed to this repository.
 
-## Submitted artifact
+## Published artifacts
 
-| Field | Value |
-| --- | --- |
-| Candidate JAR | `blockframe-dlss-0.3.18-unapproved-bricks-farlod-history-candidate-neoforge-26.2.jar` |
-| JAR SHA-256 | `32fa02e499476ca25066efaf2ef1485c743c2938ba8eff0c7572b823618cc6f1` |
-| Minecraft | `26.2` |
-| Loader | NeoForge `26.2` |
-| Public source | <https://github.com/oliverwalter33-design/blockframe-dlss> |
-| Source snapshot represented by the candidate | [`d1f2151f07ad11b9431382774ecb74f4d9271e20`](https://github.com/oliverwalter33-design/blockframe-dlss/commit/d1f2151f07ad11b9431382774ecb74f4d9271e20) |
+| Version | JAR | Bytes | SHA-256 | Matching source |
+| --- | --- | ---: | --- | --- |
+| `0.3.18-neoforge-26.2` | `blockframe-dlss-0.3.18-unapproved-bricks-farlod-history-candidate-neoforge-26.2.jar` | 34,003,950 | `32fa02e499476ca25066efaf2ef1485c743c2938ba8eff0c7572b823618cc6f1` | Repository root; source-publication commit [`d1f2151f`](https://github.com/oliverwalter33-design/blockframe-dlss/commit/d1f2151f07ad11b9431382774ecb74f4d9271e20) |
+| `0.3.16-neoforge-26.2` | `blockframe-dlss-0.3.16-neoforge-26.2.jar` | 33,953,776 | `70e53af0f3c3f505122438d792ef0568808409f05eee8cd26288ab2c2db1b5a4` | Exact full source tree: [`release/0.3.16-neoforge-26.2`](https://github.com/oliverwalter33-design/blockframe-dlss/tree/release/0.3.16-neoforge-26.2); source ZIP SHA-256 `1e39036f571b43c42d03879c5d1ed40cec40a689b5d76eee6bf07f80893f0d08`; native snapshot on `main`: [`provenance/0.3.16`](provenance/0.3.16/README.md) |
 
-The command below verifies the candidate JAR hash and all nine DLL/SPIR-V
-entries. It rejects missing, additional, or modified native binary entries.
+Both use Minecraft 26.2 and NeoForge 26.2. The public source repository is
+<https://github.com/oliverwalter33-design/blockframe-dlss>.
+
+The command below auto-detects either published JAR by SHA-256 and verifies all
+nine DLL/SPIR-V entries. It rejects an unknown JAR, or any missing, additional,
+or modified native binary entry.
 
 ```powershell
 .\scripts\verify-native-provenance.ps1 -JarPath 'C:\path\to\candidate.jar'
@@ -41,12 +41,27 @@ and output hashes and compares them with the checked-in stamp. The `jar` task
 depends on that verification and therefore fails if a generated binary is
 missing or stale.
 
+### Version 0.3.16 project-built outputs
+
+The still-published 0.3.16 JAR predates the current native implementation. Its
+complete matching source tree is published on
+[`release/0.3.16-neoforge-26.2`](https://github.com/oliverwalter33-design/blockframe-dlss/tree/release/0.3.16-neoforge-26.2).
+For one-command cross-version checks on `main`, its exact native source,
+shader, build script, and source stamp are additionally preserved under
+[`provenance/0.3.16`](provenance/0.3.16/README.md).
+
+| JAR entry | Checked-in 0.3.16 source | Compiler recorded for 0.3.16 | Bytes | Output SHA-256 |
+| --- | --- | --- | ---: | --- |
+| `nvidia_dlss_bridge.dll` | `provenance/0.3.16/native/nvidia_dlss_bridge.cpp` — `b7a47af8d0c5fe689dbd5aea39dcc43274918a0de1c570bf57d1e455cc14ae96` | Zig `0.16.0` | 583,168 | `c251c0702df49bbfc2caffad0e2be74d525e62d07ceab9d56043d3a3a41dd327` |
+| `motion_vectors.comp.spv` | `provenance/0.3.16/native/shaders/motion_vectors.comp` — `3aba5ea79bc3f6bfde8dd38da1e75050ea6f1527fa624830de1153ead74c458f` | LWJGL shaderc `3.4.1`; Vulkan 1.2; performance optimization | 12,272 | `fc89b518ffbfd39b1a2d8d37957534663b10a922a25629d116d72fe25810ea19` |
+| `motion_vectors.debug.comp.spv` | same 0.3.16 shader source | same | 16,224 | `a505c8cedd93575a852c5d277bf873447f962bc43016146404562b42f7c053b6` |
+
 ## Third-party NVIDIA runtime
 
 The six DLLs below are unmodified production binaries from official NVIDIA
 SDK releases. They remain under NVIDIA's licenses, not this project's MIT
-license. The candidate also contains the corresponding NVIDIA license and
-notice texts.
+license. Both JARs also contain the corresponding NVIDIA license and notice
+texts.
 
 Official origins (the complete SDK archive was downloaded and compared
 locally with the submitted JAR):
@@ -88,11 +103,11 @@ development binaries and stages only the signed production set.
    provenance into `native-source-v1.properties`.
 4. Run `gradle clean test build` with Gradle 9.2.1. Gradle verifies that the source stamp
    still matches every project-built native output before creating the JAR.
-5. Run `scripts/verify-native-provenance.ps1 -JarPath <jar>` to compare the
-   finished artifact with the exact submitted JAR and native-entry hashes.
+5. Run `scripts/verify-native-provenance.ps1 -JarPath <jar>` to compare either
+   published artifact with its exact JAR and version-specific native-entry
+   hashes.
 
 The repository workflow runs the source-side provenance check on every push
 and pull request. A local release build additionally performs the native
 runtime checks because NVIDIA's redistributable binaries are intentionally not
 stored in GitHub.
-

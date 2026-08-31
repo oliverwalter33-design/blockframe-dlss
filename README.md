@@ -6,7 +6,7 @@ BlockFrame DLSS is an experimental client-side NeoForge mod that integrates NVID
 
 > **Experimental:** image quality, compatibility and performance can vary by GPU, driver, resolution, resource pack, shader pack and other rendering mods.
 
-> **Official source:** Modrinth ownership and artifact correspondence are documented in [MODRINTH-OWNERSHIP.md](MODRINTH-OWNERSHIP.md). Every native DLL and SPIR-V file in the submitted candidate is mapped to its checked-in source or exact official NVIDIA release in [MODRINTH-BINARY-PROVENANCE.md](MODRINTH-BINARY-PROVENANCE.md).
+> **Official source:** Modrinth ownership and artifact correspondence are documented in [MODRINTH-OWNERSHIP.md](MODRINTH-OWNERSHIP.md). The exact 0.3.16 source tree is preserved on [`release/0.3.16-neoforge-26.2`](https://github.com/oliverwalter33-design/blockframe-dlss/tree/release/0.3.16-neoforge-26.2). Every native DLL and SPIR-V file in both Modrinth versions is mapped to its checked-in source or exact official NVIDIA release in [MODRINTH-BINARY-PROVENANCE.md](MODRINTH-BINARY-PROVENANCE.md).
 
 ## Download
 
@@ -75,10 +75,11 @@ gradle clean test build
 ```
 
 `build` intentionally fails when a required native runtime file is absent. The finished JAR is written to `build\libs`.
-The final verification command checks the candidate JAR SHA-256 and every
-native binary entry against the review manifest. For a new release, pass that
-release's expected JAR hash explicitly with `-ExpectedJarSha256` and update the
-pinned entry hashes in the verification script.
+The final verification command recognizes either published Modrinth JAR by
+SHA-256 and checks every native binary entry against its version-specific
+review manifest. For a new release, add its JAR and native-entry hashes to the
+verification script; `-ExpectedJarSha256` can additionally pin an invocation
+to one expected artifact.
 
 The native build script also accepts explicit `-StreamlineInclude`, `-VulkanInclude`, `-JniInclude`, `-ZigExecutable` and `-GlslcExecutable` parameters.
 
@@ -271,4 +272,3 @@ The public project name is **BlockFrame DLSS**. The internal NeoForge mod ID and
 Original Java, JNI and shader integration code is licensed under the [MIT License](LICENSE). NVIDIA binaries and materials are not covered by MIT and remain under the separate license texts included with release JARs. Before redistributing a build, review `META-INF/nvidia/NOTICE.txt` and the accompanying NVIDIA license files inside the JAR. NVIDIA's RTX SDK license also requires prior notification to NVIDIA before a commercial release that incorporates DLSS or NGX.
 
 This software uses NVIDIA Streamline and NVIDIA DLSS. BlockFrame DLSS is an independent community project and is not affiliated with, sponsored by or endorsed by NVIDIA, Mojang Studios, Microsoft, NeoForge, CaffeineMC or CurseForge. NVIDIA, NVIDIA DLSS, NVIDIA RTX and GeForce RTX are trademarks or registered trademarks of NVIDIA Corporation; other product names and trademarks belong to their respective owners.
-

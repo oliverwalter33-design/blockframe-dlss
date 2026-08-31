@@ -971,6 +971,7 @@ tasks.register('sourceZip', Zip) {
         include 'MODRINTH-BINARY-PROVENANCE.md'
         include '.github/**'
         include 'scripts/**'
+        include 'provenance/**'
         include 'settings.gradle'
         include 'src/**'
         include 'benchmarks/fixtures/blockframe-benchmark-config-v1.json'
@@ -986,4 +987,3 @@ tasks.register('sourceZip', Zip) {
         exclude '**/*.spv'
     }
 }
-
