@@ -20,7 +20,7 @@ The source in this repository corresponds to the BlockFrame DLSS 0.3.18 review c
 | Artifact | SHA-256 |
 | --- | --- |
 | `blockframe-dlss-0.3.18-unapproved-bricks-farlod-history-candidate-neoforge-26.2.jar` | `32FA02E499476CA25066EFAF2EF1485C743C2938BA8EFF0C7572B823618CC6F1` |
-| `blockframe-dlss-0.3.18-neoforge-26.2-sources.zip` | `53F0DBE501101019FAF2A6C07DF59E9FFF8A4534552AA5431008D765D6776A61` |
+| `blockframe-dlss-0.3.18-neoforge-26.2-sources.zip` | `9B4D0DA35E208473455BE852DD2A4751B9394395FCD4555FC2B7FD32D1EFF014` |
 
 The exact source-publication commit before this verification file was added is:
 
